@@ -1,0 +1,86 @@
+{
+  "dataset": {
+    "n_students": 1500,
+    "n_resources": 54,
+    "n_ratings": 22500,
+    "rating_density": 0.2777777777777778,
+    "n_raw_columns": 19,
+    "n_model_features": 22,
+    "level_distribution": {
+      "intermediate": 0.539,
+      "beginner": 0.263,
+      "advanced": 0.197
+    },
+    "missing_pct": {
+      "score_python": 5.87,
+      "score_sql": 5.47,
+      "score_statistics": 5.27,
+      "score_linalg": 7.0,
+      "score_dsa": 5.73,
+      "score_ml": 6.47,
+      "weekly_study_hours": 0.0,
+      "logins_per_week": 2.87,
+      "avg_session_min": 3.13,
+      "assignments_completed_pct": 0.0,
+      "quiz_attempts": 2.07,
+      "forum_posts": 0.0,
+      "days_since_last_active": 0.0,
+      "prior_cgpa": 4.6
+    },
+    "study_hours_over_60": 15
+  },
+  "clustering": {
+    "k": 3,
+    "stability_ari": 0.9668540255965618,
+    "personas": {
+      "0": "High achievers",
+      "1": "At-risk learners",
+      "2": "Steady learners"
+    },
+    "pca_explained_variance": [
+      0.543082603292193,
+      0.11965832424364191
+    ]
+  },
+  "classification": {
+    "selected_model": "Random Forest (tuned)",
+    "best_params": {
+      "Random Forest (tuned)": {
+        "model__max_depth": "None",
+        "model__min_samples_leaf": 1,
+        "model__n_estimators": 200
+      },
+      "Gradient Boosting (tuned)": {
+        "model__learning_rate": 0.05,
+        "model__max_depth": 2,
+        "model__n_estimators": 100
+      }
+    },
+    "cv_f1_macro": 0.8136871728178228,
+    "cv_f1_std": 0.022836057647524898,
+    "cv_accuracy": null,
+    "test_accuracy": 0.82,
+    "test_precision_macro": 0.8257530172562854,
+    "test_recall_macro": 0.7975579694214227,
+    "test_f1_macro": 0.8092090584560463,
+    "test_roc_auc_ovr": 0.9438770346906269
+  },
+  "regression": {
+    "selected_model": "Lasso",
+    "cv_rmse": 4.634300851405412,
+    "cv_rmse_std": 0.09547270710107922,
+    "cv_r2": 0.8753059545802815,
+    "test_rmse": 4.368057095841422,
+    "test_mae": 3.4833108682277496,
+    "test_r2": 0.8763870813775726
+  },
+  "recommender": {
+    "n_train_ratings": 18000,
+    "n_test_ratings": 4500,
+    "train_density": 0.2222222222222222
+  },
+  "split": {
+    "train": 1200,
+    "test": 300
+  }
+}
