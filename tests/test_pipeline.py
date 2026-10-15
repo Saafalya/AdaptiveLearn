@@ -1,69 +1,82 @@
-"""Fast sanity tests: python -m unittest discover -s tests"""
+"""Fast sanity tests (no OULAD download needed):  python -m unittest discover -s tests"""
 import sys
 import unittest
 from pathlib import Path
 
 import numpy as np
+import pandas as pd
+import scipy.sparse as sp
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
-from adaptivelearn.config import ALL_FEATURES, PREREQS, TOPICS  # noqa: E402
-from adaptivelearn.data_generation import generate_dataset  # noqa: E402
-from adaptivelearn.learning_path import build_learning_path  # noqa: E402
-from adaptivelearn.preprocessing import make_preprocessor, prepare  # noqa: E402
+from adaptivelearn.config import (ALL_FEATURES, CATEGORICAL_FEATURES, NUMERIC_FEATURES,  # noqa: E402
+                                  RESULT_ORDER)
+from adaptivelearn.oulad import make_key  # noqa: E402
+from adaptivelearn.preprocessing import group_split, make_preprocessor  # noqa: E402
 from adaptivelearn.recommender import ranking_metrics  # noqa: E402
+from adaptivelearn.study_plan import build_study_plan, risk_level, score_tier  # noqa: E402
 
 
-class DataTests(unittest.TestCase):
-    @classmethod
-    def setUpClass(cls):
-        cls.students, cls.resources, cls.ratings = generate_dataset(n_students=300, seed=1)
+def fake_frame(n=400, seed=0):
+    rng = np.random.default_rng(seed)
+    df = pd.DataFrame({c: rng.normal(size=n) for c in NUMERIC_FEATURES})
+    for c in CATEGORICAL_FEATURES:
+        df[c] = rng.choice(["a", "b", "c"], n)
+    df["id_student"] = rng.integers(0, 150, n)          # repeated students
+    df["final_result"] = rng.choice(RESULT_ORDER, n)
+    return df
 
-    def test_deterministic(self):
-        again, _, _ = generate_dataset(n_students=300, seed=1)
-        self.assertTrue(self.students.equals(again))
 
-    def test_shapes_and_ranges(self):
-        self.assertEqual(len(self.students), 300)
-        self.assertEqual(len(self.ratings), 300 * 15)
-        self.assertTrue(self.ratings.rating.between(1, 5).all())
-        self.assertTrue(set(self.students.level) <= {"beginner", "intermediate", "advanced"})
-
-    def test_preprocessing_handles_missing_and_outliers(self):
-        df = prepare(self.students)
-        self.assertLessEqual(df.weekly_study_hours.max(), 60)
-        out = make_preprocessor().fit_transform(df[ALL_FEATURES])
-        out = out.toarray() if hasattr(out, "toarray") else out
+class PreprocessingTests(unittest.TestCase):
+    def test_nan_and_unseen_categories_are_handled(self):
+        df = fake_frame()
+        df.loc[::7, "mean_score_early"] = np.nan
+        df.loc[::11, "gender"] = np.nan
+        prep = make_preprocessor().fit(df[ALL_FEATURES])
+        new = fake_frame(30, seed=1)
+        new["region"] = "never-seen"
+        out = prep.transform(new[ALL_FEATURES])
         self.assertFalse(np.isnan(out).any())
 
+    def test_group_split_keeps_students_apart(self):
+        tr, te = group_split(fake_frame())
+        self.assertFalse(set(tr.id_student) & set(te.id_student))
+        self.assertAlmostEqual(len(te) / (len(tr) + len(te)), 0.2, delta=0.08)
 
-class LogicTests(unittest.TestCase):
-    def test_prerequisites_come_first(self):
-        _, resources, _ = generate_dataset(n_students=50, seed=2)
-        scores = {t: 80.0 for t in TOPICS}
-        scores.update({"ml": 30.0, "python": 40.0, "statistics": 45.0})
-        ratings = {r: 3.0 for r in resources.resource_id}
-        steps = build_learning_path(scores, ratings, resources)
-        order = []
-        for s in steps:
-            if s["topic"] not in order and s["action"] != "Stretch":
-                order.append(s["topic"])
-        names = {t: TOPICS[t] for t in TOPICS}
-        for topic, prereqs in PREREQS.items():
-            if names[topic] in order:
-                for p in prereqs:
-                    if names[p] in order:
-                        self.assertLess(order.index(names[p]), order.index(names[topic]))
+    def test_make_key_is_unique_per_enrolment(self):
+        mod = pd.Series(["AAA", "AAA", "BBB"])
+        pres = pd.Series(["2013J", "2014J", "2013J"])
+        stu = pd.Series([5, 5, 5])
+        k = make_key(mod, pres, stu, {"AAA": 0, "BBB": 1}, {"2013J": 0, "2014J": 1})
+        self.assertEqual(k.nunique(), 3)
 
-    def test_ranking_metrics_perfect_and_empty(self):
-        test = np.full((2, 6), np.nan)
-        test[0, 2], test[1, 4] = 5, 4
-        train_mask = np.zeros((2, 6), dtype=bool)
-        perfect = np.zeros((2, 6))
-        perfect[0, 2], perfect[1, 4] = 10, 10
-        m = ranking_metrics(perfect, train_mask, test, k=3)
-        self.assertEqual(m["hit_rate@3"], 1.0)
-        self.assertAlmostEqual(m["ndcg@3"], 1.0)
+
+class RecommenderTests(unittest.TestCase):
+    def test_perfect_ranking_scores_one_and_seen_items_excluded(self):
+        X_train = sp.csr_matrix(np.array([[1, 0, 0, 0, 0], [0, 1, 0, 0, 0]], dtype=float))
+        X_test = sp.csr_matrix(np.array([[0, 0, 1, 0, 0], [0, 0, 0, 1, 0]], dtype=float))
+        scores = np.array([[9.0, 0, 5, 0, 0], [0, 9.0, 0, 5, 0]])   # seen item has highest score
+        m = ranking_metrics(scores, X_train, X_test, k=1)
+        self.assertEqual(m["hit_rate@1"], 1.0)
+        self.assertAlmostEqual(m["ndcg@1"], 1.0)
+
+
+class StudyPlanTests(unittest.TestCase):
+    def test_tiers_and_risk(self):
+        self.assertEqual(score_tier(40), "Foundations")
+        self.assertEqual(score_tier(65), "Core")
+        self.assertEqual(score_tier(90), "Stretch")
+        self.assertEqual(risk_level(0.7), "High")
+        self.assertEqual(risk_level(0.1), "Low")
+
+    def test_high_risk_gets_support_step_first(self):
+        up = pd.DataFrame({"assessment_type": ["TMA"], "date": [117], "weight": [20.0]})
+        plan = build_study_plan(pd.Series({"clicks_last_14d": 5}),
+                                {"Fail": 0.5, "Withdrawn": 0.3, "Pass": 0.2},
+                                48.0, "Disengaged / at-risk", pd.DataFrame(), up, 100.0)
+        self.assertEqual(plan["risk"], "High")
+        self.assertIn("tutor", plan["steps"][0]["action"].lower())
+        self.assertTrue(any("Prepare" in s["action"] for s in plan["steps"]))
 
 
 if __name__ == "__main__":

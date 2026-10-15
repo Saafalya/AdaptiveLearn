@@ -1,4 +1,0 @@
-cluster,persona,size,score_python,score_sql,score_statistics,score_linalg,score_dsa,score_ml,weekly_study_hours,logins_per_week,avg_session_min,assignments_completed_pct,quiz_attempts,forum_posts,days_since_last_active,prior_cgpa,engagement_index,final_score,mean_topic_score
-0,High achievers,386,78.63,78.96,78.22,78.56,82.16,87.32,13.81,7.16,47.51,83.96,8.56,3.45,2.33,7.91,0.53,78.33,80.65
-1,At-risk learners,439,53.06,52.28,53.0,53.22,49.96,41.55,4.84,2.99,27.79,59.79,3.92,0.76,5.73,5.64,0.33,49.13,50.49
-2,Steady learners,675,66.18,66.41,65.97,66.24,66.39,66.28,8.75,4.92,37.25,71.78,6.04,1.89,3.99,6.82,0.42,63.95,66.25

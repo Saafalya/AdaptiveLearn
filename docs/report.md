@@ -4,201 +4,229 @@
 **Team:** Swastik Gavhane (PRN 24070126224), Aryan Gawande (PRN 24070126223), Saafalya Sengupta (PRN 24070126158), _<Member 4 – name, PRN>_ · **Division:** C
 **Application domain:** Education · **SDGs:** SDG 4 (Quality Education), SDG 10 (Reduced Inequalities)
 
-> All numbers below are produced by `python run_all.py` (seed 42) and are stored in `results/metrics.json` and `results/tables/`.
+> Every number below is produced by `python run_all.py` (seed 42) and stored in `results/metrics.json` and `results/tables/`. The data are **real**: the Open University Learning Analytics Dataset (OULAD).
 
 ---
 
 ## 1. Problem refinement and use-case relevance
 
-**Problem.** Most learning platforms serve the same content in the same order to every learner, even though learners differ in prior knowledge, pace, engagement and weak areas. Weak students are lost; strong students are bored; and learners with limited connectivity are served the same heavy video content as everyone else.
+**Problem.** Distance-learning courses lose a large share of students: in the dataset used here, 40 % of the students still enrolled at day 90 end up failing or withdrawing. Tutors cannot read thousands of activity logs, and every student receives the same materials in the same order. By the time a failed assignment reveals a problem, it is often too late to help.
 
-**Objective.** Build an ML pipeline that, from a learner's diagnostic scores and behavioural logs,
+**Objective.** Use only the data available **by day 90 of a course** (about one-third of the way through) to
 
-1. **predicts the level** (beginner / intermediate / advanced) they will reach — *classification*;
-2. **predicts the expected final-assessment score** — *regression*;
-3. **groups learners into personas** to guide instructors — *clustering*;
-4. **recommends resources** (topic, difficulty, format) — *recommendation*;
-5. **assembles a prerequisite-aware learning path** with checkpoint/advance rules.
+1. **predict the final result** (Distinction / Pass / Fail / Withdrawn) — *classification*;
+2. **predict performance on the remaining assessments** — *regression*;
+3. **group learners into behavioural personas** for instructors — *clustering*;
+4. **recommend the next learning resources** — *recommendation*;
+5. **turn these outputs into a personalised, assessment-aligned study plan** with an early-warning flag.
 
-**Stakeholders.** Students (personalised path), instructors (cohort personas and early-warning of at-risk learners), institutions/EdTech platforms (scalable personalisation).
+**Stakeholders.** Students (what to study next), tutors/instructors (who to contact this week), institutions (retention, equitable support).
 
-**Scope and boundaries.** Six technical topics (Python, SQL, Statistics, Linear Algebra, DSA, Machine Learning); 54 learning resources (6 topics × 3 difficulty tiers × 3 formats). The system *recommends*, it does not grade or replace instructors.
+**Scope.** 7 modules, 22 presentations (2013–2014) from one distance-learning university. The system supports tutors and students; it does not make grading or admission decisions.
 
-**SDG alignment.** *SDG 4* – targets personalised, effective learning outcomes. *SDG 10* – the data contains an `internet_access` attribute and the evaluation includes a **per-group fairness check**, so the system can be audited for under-serving low-connectivity learners (Section 5.5).
+**SDG alignment.** *SDG 4* — earlier, personalised support for completing quality education. *SDG 10* — the data contain real socio-economic and demographic attributes (deprivation band, disability, gender, age), so the system is **audited for unequal error rates** across groups (Section 5.6).
 
 ## 2. Dataset understanding, preprocessing and feature handling
 
-### 2.1 Source and why it is synthetic
-No public dataset combines (a) per-topic diagnostic scores, (b) behavioural logs, and (c) learner-resource feedback. The project therefore uses a **documented, seeded simulator** (`src/adaptivelearn/data_generation.py`):
+### 2.1 Source
+**Open University Learning Analytics Dataset (OULAD)** — Kuzilek, Hlosta, Zdrahal, *Scientific Data* 4:170171 (2017), doi:10.1038/sdata.2017.171. Anonymised, **CC BY 4.0**. Obtained from the authors' Figshare record (the university's own download link was returning 404 at the time of download); file `anonymisedData.zip`, 46.7 MB, MD5 `7412686f…354308` verified.
 
-```
-aptitude, motivation, internet access  ->  topic mastery (with prerequisite effects: DSA<-Python; ML<-Python,Stats,LinAlg)
-mastery + assignments + study hours    ->  hidden final score  ->  level
-mastery vs. resource tier/format       ->  resource ratings (1-5)
-```
-Realistic data-quality problems are injected *after* the clean values are used to generate ratings, so the targets are not corrupted but the features are.
+| Table | Rows | Content |
+|---|---|---|
+| `studentInfo` | 32,593 | demographics, prior attempts, credits, **final_result** |
+| `studentRegistration` | 32,593 | registration / unregistration day |
+| `assessments` | 206 | type (TMA / CMA / Exam), due day, weight |
+| `studentAssessment` | 173,912 | submission day and score |
+| `vle` | 6,364 | learning-site metadata: activity type, week |
+| `studentVle` | 10,655,280 | daily click counts per student per site |
+| `courses` | 22 | module-presentation length |
 
-> **Limitation (stated openly):** results measure how well the ML pipeline recovers a simulated learning process; they are not evidence of real-world learning gains. The code is written so that a real dataset (e.g. OULAD or UCI *Student Performance*) can replace `data/students.csv` with the same column names.
+32,593 enrolments by 28,785 students; **3,538 students enrolled more than once**.
 
-### 2.2 Dataset summary
-| Item | Value |
+### 2.2 Unit of analysis and "no peeking" rule
+One row = one student's enrolment in one presentation, described **only by data up to day 90** (`CUTOFF_DAY`). Targets lie in the future:
+
+| Target | Definition |
 |---|---|
-| Students | 1,500 (19 raw columns) |
-| Resources | 54 (`resources.csv`) |
-| Ratings | 22,500 (15 per student, matrix density 27.8 %) |
-| Train / test split | 1,200 / 300, stratified on level |
-| Target 1 (classification) | `level`: intermediate 53.9 %, beginner 26.3 %, advanced 19.7 % |
-| Target 2 (regression) | `final_score` (0–100) |
-| Model input features | 22 (6 topic scores, 8 behaviour, 2 context categorical, 5 engineered numeric, 1 engineered categorical) |
+| `final_result` | Distinction, Pass, Fail, Withdrawn |
+| `future_mean_score` | mean score of non-exam assessments *due after day 90* (available for 80.2 % of rows) |
 
-Level bands: `< 55` beginner, `55–74.9` intermediate, `≥ 75` advanced. Figures: `01_distributions.png`, `03_correlation.png`.
+Students who had **already unregistered by day 90** are removed (their outcome is known). This leaves **25,562 enrolments (23,398 students)**: Pass 48.4 %, Fail 27.6 %, Withdrawn 12.3 %, Distinction 11.8 %.
 
-### 2.3 Data quality issues and handling
+### 2.3 Features (34)
+| Group | Examples |
+|---|---|
+| Demographic / context (12) | gender, region, highest education, IMD deprivation band, age band, disability, prior attempts, credits, module, season, registration day |
+| Engagement from 10.6M clicks (14) | total clicks, active days, distinct sites, clicks before course start, last-14-day clicks and trend, days since last active, share of clicks on home / content / forum / quiz / other |
+| Assessments up to day 90 (8) | number due, number submitted, submission rate, mean/min score, late submissions, mean days early, failed count |
+
+### 2.4 Data quality and handling
 | Issue | Size | Treatment |
 |---|---|---|
-| Topic not attempted (`score_*` missing) | 5.3–7.0 % per topic | Median imputation **plus a missing-indicator column** (non-attempt is informative) |
-| Missing `prior_cgpa`, `avg_session_min`, `logins_per_week`, `quiz_attempts` | 2–5 % | Median imputation inside the CV pipeline |
-| Impossible `weekly_study_hours` (> 60, entry errors) | 15 rows | Domain rule → set to NaN → imputed |
-| Bounded variables | – | Scores clipped to [0,100], CGPA to [0,10] |
-| Scale differences | – | `StandardScaler` (for LR, KNN, SVM, clustering) |
-| Categoricals | `internet_access`, `preferred_format`, `weakest_topic` | Mode imputation + one-hot |
+| No early assessment submitted | 6.9 % of rows | median imputation **+ missing-indicator column** (non-submission is informative) |
+| No VLE activity → click shares undefined | 2.0 % | median imputation |
+| `imd_band` missing | 1,111 enrolments in raw data | own category "Unknown" |
+| Skewed counts (clicks, sites) | – | `log1p` for clustering; scaling for linear/KNN models |
+| Class imbalance (Withdrawn 12 %) | – | class weights, **macro-F1** as selection metric |
+| Categorical variables | 8 | most-frequent imputation, one-hot (rare levels pooled) |
+| Same student in several presentations | 3,538 students | **grouped splits** — no student is ever in both train and test (checked: 0 overlap) |
 
-See `02_missing_values.png`.
-
-### 2.4 Feature engineering
-`mean_topic_score`, `min_topic_score`, `score_spread`, `n_topics_attempted`, `weakest_topic`, `engagement_index = mean(logins/21, session/120, assignments/100)`. All are **row-wise** functions of a single student, so no dataset statistics leak across the split. Feature importance (permutation, test set): `mean_topic_score` (0.038) and `assignments_completed_pct` (0.036) lead, followed by `min_topic_score` and `weekly_study_hours` (`09_feature_importance.png`).
+Figures: `01_outcomes_vs_engagement.png`, `02_missing_values.png`, `03_correlation.png`.
 
 ### 2.5 Validation strategy
-Stratified 80/20 hold-out; **5-fold stratified CV on the training set** for model selection and grid search; the test set is touched once per model for reporting and is **never used to pick the model**. All imputers/scalers/encoders sit inside sklearn `Pipeline`s, so they are fitted on training folds only.
+Stratified, student-grouped 80/20 hold-out (20,449 train / 5,113 test). Model selection and grid search use **5-fold stratified group CV on the training set only**; the test set is used once per model for reporting. All imputers/scalers/encoders sit inside `Pipeline`s fitted per fold.
 
 ## 3. Methodology and ML pipeline design
 
 ```
-raw logs ──► clean ──► feature engineering ──► ColumnTransformer (impute/scale/encode)
-                                                   │
-        ┌──────────────────┬───────────────────────┼──────────────────────┐
-        ▼                  ▼                       ▼                      ▼
-  Clustering          Classification          Regression           Recommender
-  (personas)          (level)                 (final score)        (resource rating)
-        └──────────────────┴────────────┬──────────┴──────────────────────┘
-                                         ▼
-                          Learning-path generator (prerequisites + checkpoints)
+OULAD CSVs ─► per-enrolment features @ day 90 ─► ColumnTransformer (impute / scale / one-hot)
+                                         │
+       ┌─────────────────┬───────────────┼────────────────┬──────────────────┐
+       ▼                 ▼               ▼                ▼                  ▼
+  Clustering       Classification   Regression      Recommender       Fairness audit
+  (5 personas)     (4 outcomes)     (future score)  (next sites)      (SDG 10)
+       └────────────┬────┴───────────────┴────────────────┘
+                    ▼
+        Study-plan generator (risk tier + peers + upcoming real assessments)
 ```
 
-| Task | Candidate algorithms | Why |
+| Task | Algorithms | Rationale |
 |---|---|---|
-| Classification | Baseline, Logistic Regression, KNN, Decision Tree, Random Forest, Gradient Boosting, SVM-RBF (+ grid-searched RF/GB) | Spans linear, instance-based, single tree, bagging, boosting and kernel methods; baseline sets the floor |
-| Regression | Baseline, Linear, Ridge, Lasso, KNN, Random Forest, Gradient Boosting, SVR | Same reasoning; regularised linear models test whether complexity is needed |
-| Clustering | K-Means, Gaussian Mixture, Agglomerative (Ward) | Centroid, probabilistic and hierarchical views; K-Means gives deployable `predict` |
-| Recommendation | Random, Popularity, User+item bias, Collaborative (low-rank SVD completion), Content-based (Gradient Boosting on student–resource pair features), Hybrid | Standard ladder from naïve to personalised; content features handle **cold-start** students |
+| Classification | Baseline, Logistic Regression, KNN, Decision Tree, Random Forest, Hist. Gradient Boosting (+ grid-searched RF and HGB) | linear → instance → tree → bagging → boosting; baseline sets the floor |
+| Regression | Baseline, Ridge, Lasso, KNN, Random Forest, Hist. Gradient Boosting | same ladder |
+| Clustering | K-Means, Gaussian Mixture, Agglomerative (Ward) | centroid / probabilistic / hierarchical views; K-Means gives deployable `predict` |
+| Recommendation | Random, Popularity, Persona popularity, Item-kNN (cosine), SVD, Hybrid (kNN + persona) | standard ladder for implicit feedback; persona links to clustering |
 
-**Evaluation plan.** Classification: accuracy, macro precision/recall/F1, macro one-vs-rest ROC-AUC, confusion matrix (macro-F1 because classes are imbalanced). Regression: RMSE, MAE, R². Clustering: silhouette, Davies–Bouldin, Calinski–Harabasz, run-to-run stability (ARI). Recommendation: RMSE/MAE on held-out ratings and Precision/Recall/NDCG/Hit-rate @5 with a per-student 80/20 hold-out (relevant = rating ≥ 4).
+**Evaluation plan.** Classification: accuracy, macro P/R/F1, macro OvR ROC-AUC, per-class F1, confusion matrix, plus the practical *at-risk* view (Fail ∪ Withdrawn) with ROC-AUC and average precision. Regression: RMSE, MAE, R². Clustering: silhouette, Davies–Bouldin, Calinski–Harabasz, stability (ARI) and *external validation against real outcomes*. Recommendation: Precision/Recall/NDCG/Hit-rate @10 and catalogue coverage under a **temporal hold-out** (train on sites first visited by day 90, test on sites first visited on days 91–150, averaged over 22 presentations). Additional analyses: feature-group ablation, **early-prediction sweep** (cut-offs 0–180), fairness audit.
 
-**Learning-path rules.** Topics scoring < 60 (or unassessed) are remediated, weakest first; shaky prerequisites (< 65) are pulled in and ordered topologically; tier = Fundamentals (< 55) / Core (55–74) / Advanced (≥ 75); each topic ends in a checkpoint — *score ≥ 75 % → advance a tier, otherwise repeat practice*; mastered topics get stretch resources.
+**Study-plan rules.** From the predicted outcome probabilities: risk = P(Fail) + P(Withdrawn) → Low (< 35 %), Medium, High (≥ 60 %); tier from predicted future score: Foundations (< 55), Core, Stretch (≥ 75); an engagement-gap step if last-14-day clicks are below 80 % of successful peers in the same module; recommended resources from the recommender; and one "prepare for …" step with a checkpoint rule (≥ 75 % → move on, else repeat practice) for each of the next three *real* assessments of that module.
 
 ## 4. Implementation
 
 | Component | File |
 |---|---|
-| Config, topic taxonomy, thresholds | `src/adaptivelearn/config.py` |
-| Simulator | `src/adaptivelearn/data_generation.py` |
-| Cleaning / features / transformer | `src/adaptivelearn/preprocessing.py` |
-| Classification & regression | `src/adaptivelearn/supervised.py` |
+| Config, thresholds, feature groups | `src/adaptivelearn/config.py` |
+| OULAD loading, 10.6M-row aggregation, features/targets | `src/adaptivelearn/oulad.py` |
+| Preprocessing, grouped splits | `src/adaptivelearn/preprocessing.py` |
+| Classification, regression, ablation, early sweep, fairness | `src/adaptivelearn/supervised.py` |
 | Personas | `src/adaptivelearn/clustering.py` |
 | Recommender | `src/adaptivelearn/recommender.py` |
-| Learning path | `src/adaptivelearn/learning_path.py` |
-| Inference for one student | `src/adaptivelearn/inference.py` |
-| Figures | `src/adaptivelearn/viz.py` |
-| End-to-end runner | `run_all.py` |
-| Demo web app | `app/streamlit_app.py` |
-| Tests | `tests/test_pipeline.py` |
+| Study plan | `src/adaptivelearn/study_plan.py` |
+| Single-student inference | `src/adaptivelearn/inference.py` |
+| Runner · demo app · tests | `run_all.py` · `app/streamlit_app.py` · `tests/test_pipeline.py` |
 
-Reproducibility: fixed seed, `requirements.txt`, one command (`python run_all.py`, ≈ 4 min on a laptop CPU). The Streamlit app loads the saved models and, for any student profile, shows predicted level and score, persona, top-5 resources and the full learning path.
+Reproducible: fixed seed, `requirements.txt`, one command (≈ 6 min on a laptop). The Streamlit app lets a user pick a held-out student, see predicted outcome, risk, persona, recommended resources and study plan, and change behaviour sliders ("what if they were active more?").
 
 ## 5. Results, evaluation and comparative analysis
 
-### 5.1 Level classification (test set, n = 300)
-| Model | CV macro-F1 (±sd) | Test acc. | Test macro-F1 | ROC-AUC |
+### 5.1 Outcome classification (4 classes; test n = 5,113)
+| Model | CV macro-F1 (±sd) | Test acc. | Test macro-F1 | OvR AUC | At-risk AUC |
+|---|---|---|---|---|---|
+| **Random Forest (tuned)** | **0.507 ± 0.004** | 0.573 | 0.504 | 0.801 | 0.858 |
+| Hist. Gradient Boosting (tuned) | 0.498 ± 0.001 | 0.531 | 0.492 | 0.800 | 0.859 |
+| Random Forest | 0.495 ± 0.006 | 0.606 | 0.483 | 0.801 | 0.859 |
+| Hist. Gradient Boosting | 0.495 ± 0.004 | 0.529 | 0.489 | 0.799 | 0.859 |
+| Logistic Regression | 0.481 ± 0.004 | 0.505 | 0.473 | 0.788 | 0.851 |
+| Decision Tree | 0.445 ± 0.010 | 0.480 | 0.447 | 0.766 | 0.830 |
+| KNN | 0.393 ± 0.005 | 0.598 | 0.377 | 0.767 | 0.845 |
+| Baseline (majority) | 0.163 | 0.483 | 0.163 | 0.500 | 0.500 |
+
+Per class (selected model): Pass F1 0.66, Fail 0.58, Distinction 0.49, **Withdrawn 0.28**.
+
+*Reading.* This is a genuinely hard task; honest numbers are modest. The selected model triples the baseline's macro-F1 (0.50 vs 0.16). Ensembles beat linear and distance-based models, but the top four are within ≈ 0.01 macro-F1, so none is decisively better. The weak class is *Withdrawn* (F1 0.28): leaving after day 90 is largely driven by life events that clicks cannot reveal. For **early warning the binary at-risk view is what matters: ROC-AUC 0.86, average precision 0.83** (baseline 0.40). Tuning RF improved CV macro-F1 by only 0.012 — the ceiling is the information in the data, not the algorithm. See `08_classification_comparison.png`, `09_confusion_matrix.png`.
+
+### 5.2 Which data matters? (ablation, Hist. Gradient Boosting, test)
+| Feature set | macro-F1 | at-risk AUC |
+|---|---|---|
+| Demographics only | 0.330 | 0.651 |
+| Engagement (VLE clicks) only | 0.384 | 0.773 |
+| Assessments only | 0.462 | 0.837 |
+| Engagement + assessments | 0.475 | 0.852 |
+| All features | 0.489 | 0.859 |
+
+Assessment history is the strongest single source, engagement adds a clear increment, and demographics add little (and are the ethically sensitive ones). Permutation importance agrees: `mean_score_early` (0.044) ≫ `submission_rate` (0.022) > `min_score_early` (0.014) > `code_module` (0.010) (`10_feature_importance.png`, `11_ablation.png`).
+
+### 5.3 How early can risk be detected? (cut-off sweep)
+| Cut-off day | Students | Accuracy | Macro-F1 | At-risk AUC |
 |---|---|---|---|---|
-| **Random Forest (tuned)** | **0.814 ± 0.023** | 0.820 | 0.809 | 0.944 |
-| Random Forest | 0.812 ± 0.025 | 0.813 | 0.802 | 0.945 |
-| Gradient Boosting (tuned) | 0.810 ± 0.028 | 0.813 | 0.805 | 0.940 |
-| Logistic Regression | 0.800 ± 0.041 | 0.807 | 0.797 | 0.941 |
-| Gradient Boosting | 0.799 ± 0.032 | 0.817 | 0.808 | 0.935 |
-| SVM (RBF) | 0.783 ± 0.029 | 0.810 | 0.797 | 0.938 |
-| Decision Tree | 0.768 ± 0.027 | 0.810 | 0.803 | 0.892 |
-| KNN | 0.760 ± 0.016 | 0.763 | 0.740 | 0.918 |
-| Baseline (majority) | 0.234 ± 0.001 | 0.540 | 0.234 | 0.500 |
+| 0 (course start) | 29,496 | 0.385 | 0.377 | 0.715 |
+| 30 | 27,466 | 0.449 | 0.434 | 0.796 |
+| 60 | 26,361 | 0.500 | 0.467 | 0.828 |
+| **90** | 25,562 | 0.529 | 0.489 | 0.859 |
+| 120 | 24,777 | 0.578 | 0.516 | 0.896 |
+| 150 | 24,055 | 0.612 | 0.533 | 0.914 |
+| 180 | 23,275 | 0.676 | 0.567 | 0.939 |
 
-*Reading.* Every real model beats the majority baseline by ~0.57 macro-F1. The top five models are within one CV standard deviation of each other, so **no single model is significantly better**; Random Forest (tuned) was selected on CV score, not test score. KNN is clearly worst (distance metrics suffer with 22+ mixed features). See `07_classification_comparison.png`, `08_confusion_matrix.png`.
+Even **before the course starts** (registration data + pre-start clicks) at-risk AUC is 0.72; by day 30 it is 0.80. Day 90 balances earliness against accuracy and still leaves ~170 days to intervene (`04_early_prediction.png`).
 
-### 5.2 Final-score regression (test set)
+### 5.4 Future-score regression (test n = 4,080)
 | Model | CV RMSE | Test RMSE | Test MAE | Test R² |
 |---|---|---|---|---|
-| **Lasso** | **4.63** | **4.37** | **3.48** | **0.876** |
-| Ridge | 4.68 | 4.48 | 3.56 | 0.870 |
-| Linear Regression | 4.69 | 4.47 | 3.56 | 0.870 |
-| Gradient Boosting | 4.80 | 4.63 | 3.61 | 0.861 |
-| Random Forest | 4.82 | 4.49 | 3.52 | 0.870 |
-| KNN | 5.70 | 5.37 | 4.22 | 0.813 |
-| SVR (RBF) | 5.75 | 5.16 | 4.05 | 0.827 |
-| Baseline (mean) | 13.15 | 12.43 | 10.30 | 0.000 |
+| **Hist. Gradient Boosting** | **11.39 ± 0.13** | **11.03** | **8.27** | **0.548** |
+| Random Forest | 11.43 | 11.25 | 8.43 | 0.530 |
+| Ridge | 12.29 | 12.03 | 9.16 | 0.462 |
+| Lasso | 12.33 | 12.09 | 9.19 | 0.457 |
+| KNN | 12.48 | 12.18 | 9.17 | 0.449 |
+| Baseline (mean) | 16.41 | 16.41 | 12.81 | 0.000 |
 
-*Reading.* Simple regularised linear models win. This is expected here: the simulator builds the final score as a (noisy) linear combination of the inputs, so extra model capacity buys nothing. On real data we would expect ensembles to be more competitive. The average error of ≈ 3.5 points is smaller than the width of a level band (20 points).
+Boosting explains ≈ 55 % of the variance in future assessment scores and cuts RMSE by 33 % versus predicting the mean. The ≈ 8-point MAE is enough to place a student in a Foundations / Core / Stretch tier, but not to predict an exact mark (`12_regression_fit.png`).
 
-**Feature-group ablation (Lasso):** topic scores only → RMSE 4.94; behaviour & context only → 6.23; all features → **4.37**. Diagnostic scores carry most of the signal, but behaviour adds a measurable improvement, which justifies collecting engagement logs.
+### 5.5 Learner personas (K-Means, k = 5)
+k was restricted to 3–6 (a pedagogically usable range); within it silhouette peaks at k = 5 (0.186). Silhouette for k = 2 is higher (0.348) but only separates "active" from "inactive". Stability across 8 random starts: **ARI = 0.75** (moderate). Algorithm comparison on a 6,000-student sample: K-Means silhouette 0.184 / Davies–Bouldin 1.60 / Calinski–Harabasz 1,309; Agglomerative (Ward) 0.167 / 1.67 / 1,043; Gaussian Mixture 0.078 / 2.61 / 680.
 
-### 5.3 Learner personas (clustering)
-Selected **k = 3** (K-Means, silhouette 0.188, Davies–Bouldin 1.58, Calinski–Harabasz 606; restricted to k ∈ [3,6] for pedagogical usefulness). Stability across 10 random starts: **ARI = 0.97**.
-
-| Persona | n | Mean topic score | Engagement idx | Final score | Level mix (B / I / A) |
-|---|---|---|---|---|---|
-| High achievers | 386 | 80.6 | 0.53 | 78.3 | 0 % / 34 % / 66 % |
-| Steady learners | 675 | 66.2 | 0.42 | 64.0 | 8 % / 86 % / 6 % |
-| At-risk learners | 439 | 50.5 | 0.33 | 49.1 | 78 % / 22 % / 0 % |
-
-| Algorithm | Silhouette | Davies–Bouldin | Calinski–Harabasz |
-|---|---|---|---|
-| **K-Means** | 0.188 | 1.58 | 606 |
-| Agglomerative (Ward) | 0.181 | 1.45 | 504 |
-| Gaussian Mixture | 0.046 | 4.74 | 132 |
-
-*Reading.* Silhouette values are low (< 0.25): the learner population is a **continuum, not well-separated blobs**, so personas are useful *segments*, not natural species. K-Means and Ward agree; GMM struggles with 15 correlated dimensions. The personas correlate strongly with the supervised level label although the label was never used in clustering. `ML` is the weakest topic for at-risk learners (41.6), consistent with its three prerequisites. See `04_cluster_selection.png`, `05_cluster_pca.png`, `06_persona_profiles.png`.
-
-### 5.4 Recommender (per-student 80/20 hold-out; 18,000 train / 4,500 test ratings)
-| Model | RMSE | MAE | P@5 | R@5 | NDCG@5 | Hit@5 |
+| Persona | n | Median clicks | Active days | Median early score | Days idle | Real outcome (Distinction / Pass / Fail / Withdrawn) |
 |---|---|---|---|---|---|---|
-| Random | 1.609 | 1.318 | 0.036 | 0.109 | 0.072 | 0.173 |
-| Popularity (item mean) | 0.998 | 0.820 | 0.061 | 0.185 | 0.126 | 0.279 |
-| User+item bias | 1.013 | 0.828 | 0.061 | 0.185 | 0.126 | 0.279 |
-| Collaborative (SVD) | 1.022 | 0.818 | 0.058 | 0.176 | 0.120 | 0.265 |
-| **Content-based (GBM)** | **0.705** | **0.551** | **0.085** | **0.260** | **0.174** | **0.389** |
-| Hybrid (0.5/0.5) | 0.779 | 0.630 | 0.075 | 0.231 | 0.154 | 0.345 |
+| Engaged high performers | 8,649 | 997 | 47 | 82 | 1 | 16 % / 62 % / 14 % / 8 % |
+| Discussion-driven learners | 5,213 | 480 | 35 | 80 | 1 | 14 % / 56 % / 20 % / 10 % |
+| Steady learners | 3,060 | 398 | 23 | 78 | 7 | 13 % / 43 % / 27 % / 17 % |
+| Low-score, moderate effort | 6,701 | 209 | 16 | 69 | 15 | 7 % / 40 % / 38 % / 16 % |
+| **Disengaged / at-risk** | 1,939 | **13** | **2** | – | **78** | 1 % / 7 % / **75 %** / 17 % |
 
-*Reading.* The content-based model reduces rating RMSE by 29 % over popularity and more than doubles Hit@5 relative to random (0.389 vs 0.173). **Collaborative SVD does not beat the popularity baseline** — with only 15 ratings per student and ratings driven mainly by *fit between mastery and resource level*, there is little latent collaborative structure to exploit; this is a legitimate finding, not a bug. Blending in SVD monotonically degrades results (α sweep, `recommender_alpha_sweep.csv`), so the deployed recommender is the content-based model. Because it takes student *features* rather than a user id, it also handles **cold-start** students. Caveat: ratings were simulated from the same pair features the content model sees, which favours it by construction.
+*Reading.* Silhouette is low (< 0.2): learner behaviour is a continuum, so personas are *segments*, not natural species. But they are stable, interpretable, and — importantly — **validated against outcomes the clustering never saw**: the "Disengaged" persona fails or withdraws 92 % of the time versus 22 % for "Engaged high performers" (`06_cluster_pca.png`, `07_persona_outcomes.png`).
 
-### 5.5 Fairness check (SDG 10)
-| Internet access | n | Accuracy | Macro-F1 |
-|---|---|---|---|
-| Limited | 67 | 0.836 | 0.848 |
-| Moderate | 123 | 0.805 | 0.791 |
-| Good | 110 | 0.827 | 0.807 |
+### 5.6 Fairness audit (SDG 10; "flag as at-risk" if predicted Fail/Withdrawn)
+| Group | n | Actual at-risk | Flagged | Recall (TPR) | False-alarm (FPR) |
+|---|---|---|---|---|---|
+| Female | 2,371 | 38.8 % | 34.5 % | 0.66 | 0.15 |
+| Male | 2,742 | 40.7 % | 35.3 % | 0.68 | 0.13 |
+| No disability | 4,620 | 39.0 % | 34.2 % | 0.67 | 0.13 |
+| Disability | 493 | 47.9 % | 41.4 % | 0.67 | 0.18 |
+| IMD 0–10 % (most deprived) | 498 | 51.4 % | 48.2 % | 0.73 | 0.22 |
+| IMD 90–100 % (least deprived) | 384 | 32.6 % | 27.1 % | 0.65 | 0.09 |
+| Education below A-level | 1,956 | 49.6 % | 43.4 % | 0.70 | 0.17 |
+| HE qualification | 703 | 32.9 % | 27.2 % | 0.64 | 0.09 |
 
-No group is under-served by the level classifier (differences are within sampling noise at these group sizes; n = 67 for "limited").
+*Reading.* Detection rates (recall) are similar across gender and disability and *higher* for the most deprived group, so the system does not miss disadvantaged students. The cost is **more false alarms** for the most deprived (22 % vs 9 %) and for students with lower prior education: the model flags in proportion to real differences in at-risk rates, which means some students would receive unnecessary outreach. Mitigation: use flags only to *offer* support, never to restrict opportunity; monitor these rates per cohort. The full table is in `results/tables/fairness_audit.csv` (`14_fairness.png`).
+
+### 5.7 Next-resource recommender (22 presentations, temporal hold-out, top-10)
+| Model | Precision@10 | Recall@10 | NDCG@10 | Hit-rate@10 | Coverage |
+|---|---|---|---|---|---|
+| Random | 0.096 | 0.077 | 0.103 | 0.545 | 0.99 |
+| Popularity | 0.146 | 0.136 | 0.173 | 0.674 | 0.45 |
+| Persona popularity | 0.148 | 0.135 | 0.177 | 0.675 | 0.48 |
+| Item-kNN (cosine) | 0.150 | 0.138 | 0.176 | 0.676 | 0.47 |
+| SVD (k = 20) | 0.150 | 0.141 | 0.174 | **0.721** | 0.60 |
+| Hybrid (kNN + persona) | 0.150 | 0.138 | 0.177 | 0.677 | 0.47 |
+
+*Reading.* Every learned model clearly beats random (precision +55 %), but **personalisation adds little over plain popularity** (precision 0.150 vs 0.146). The reason is structural: sites unlock on a teaching schedule, so what students open next is dominated by *when*, not *who*. SVD gives the best hit-rate (0.72 vs 0.67) and the widest coverage, but only the kNN-persona hybrid is deployed in the app because it is explainable ("popular among learners like you") and cheap to refresh. Improving this part would need schedule-aware features (`week_from`) and learning-gain feedback (`13_recommender_comparison.png`).
 
 ## 6. Conclusion, limitations and future scope
 
-**Conclusion.** A pipeline of four complementary ML tasks gives a working personalisation engine: it predicts learner level with ≈ 0.81 macro-F1, final score within ≈ 3.5 points, segments learners into three interpretable personas, ranks resources with 29 % lower error than a popularity baseline, and turns these outputs into a prerequisite-aware path.
+**Conclusion.** Using only the first 90 days of activity, the system identifies students who will fail or withdraw with ROC-AUC 0.86 (average precision 0.83), predicts future assessment scores with R² 0.55, segments learners into five outcome-validated personas, recommends next resources better than chance, and converts all this into a study plan tied to each module's real assessment calendar — with a fairness audit across deprivation, disability, gender and age.
 
-**Limitations.** (1) Synthetic data — conclusions about *absolute* accuracy do not transfer to real learners; (2) linear generative process favours linear regressors; (3) simulated ratings favour the content model; (4) no longitudinal data, so *learning gain* from following the path is not measured; (5) small subgroup sizes limit fairness conclusions.
+**Limitations.** (1) One distance-learning university, 2013–2014: results may not transfer to other institutions or modalities. (2) Four-class accuracy is modest (macro-F1 0.50); *Withdrawn* is poorly predicted. (3) Predictive, not causal: the model shows who is at risk, not whether the recommended plan would help — **no learning-gain evaluation was possible offline**. (4) Recommender gains over popularity are small. (5) Demographic features can encode structural inequality; the audit found higher false-alarm rates for the most deprived. (6) Students who unregistered before day 90 are excluded by design.
 
-**Future scope.** Validate on real LMS data (OULAD, institutional logs); sequence models / knowledge tracing (BKT, DKT) for time-aware mastery; contextual bandits to learn from learner responses online; explainability (SHAP) in the instructor dashboard; A/B test of path-following vs. control for learning gain.
+**Future scope.** Pilot with tutors and A/B-test outreach (the only way to measure real benefit); survival models for time-to-withdrawal; sequence models of weekly activity; schedule-aware and content-aware recommenders; per-group threshold calibration and explanations (SHAP) for tutors; use of free-text forum content.
+
+## Ethics and data protection
+OULAD is publicly released, anonymised data under CC BY 4.0. No attempt is made to re-identify students. Predictions are risk estimates to trigger *offers of support*; they must not be used for grading, selection or sanction.
 
 ## References
-1. Pedregosa et al., "Scikit-learn: Machine Learning in Python", *JMLR* 12, 2011.
-2. Breiman, L., "Random Forests", *Machine Learning* 45(1), 2001.
-3. Friedman, J., "Greedy Function Approximation: A Gradient Boosting Machine", *Annals of Statistics* 29(5), 2001.
-4. Koren, Bell, Volinsky, "Matrix Factorization Techniques for Recommender Systems", *IEEE Computer* 42(8), 2009.
-5. Rousseeuw, P., "Silhouettes: a graphical aid to the interpretation and validation of cluster analysis", *J. Comput. Appl. Math.* 20, 1987.
-6. Corbett & Anderson, "Knowledge tracing: Modeling the acquisition of procedural knowledge", *UMUAI* 4, 1994.
-7. United Nations, *Sustainable Development Goals 4 and 10*, https://sdgs.un.org/goals.
+1. Kuzilek, J., Hlosta, M., Zdrahal, Z., "Open University Learning Analytics dataset", *Scientific Data* 4:170171, 2017. doi:10.1038/sdata.2017.171
+2. Pedregosa et al., "Scikit-learn: Machine Learning in Python", *JMLR* 12, 2011.
+3. Breiman, L., "Random Forests", *Machine Learning* 45(1), 2001.
+4. Friedman, J., "Greedy Function Approximation: A Gradient Boosting Machine", *Annals of Statistics* 29(5), 2001.
+5. Sarwar, Karypis, Konstan, Riedl, "Item-based collaborative filtering recommendation algorithms", *WWW*, 2001.
+6. Koren, Bell, Volinsky, "Matrix Factorization Techniques for Recommender Systems", *IEEE Computer* 42(8), 2009.
+7. Rousseeuw, P., "Silhouettes: a graphical aid to the interpretation and validation of cluster analysis", *J. Comput. Appl. Math.* 20, 1987.
+8. United Nations, *Sustainable Development Goals 4 and 10*, https://sdgs.un.org/goals.

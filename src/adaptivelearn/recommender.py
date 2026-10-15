@@ -1,184 +1,173 @@
-"""Resource recommender: baselines, collaborative filtering, content-based and hybrid.
+"""Next-resource recommender from implicit feedback (VLE site visits).
 
-Ratings (1-5) are predicted for every (student, resource) pair; the top-k
-unseen resources are recommended. Evaluation is a per-student hold-out.
+For every module presentation: learners who visited a set of sites in the first
+`cutoff` days are given a ranked list of *new* sites; we check which sites they
+actually first visited in the following `horizon` days (a temporal hold-out,
+which is how the system would be used in production).
 """
 import numpy as np
 import pandas as pd
-from sklearn.ensemble import GradientBoostingRegressor
+import scipy.sparse as sp
+from sklearn.decomposition import TruncatedSVD
 
-from .config import ADVANCED_MIN, BEGINNER_MAX, SEED, TOPICS, TOPIC_COLS
+from .config import CUTOFF_DAY, SEED
 
-PAIR_FEATURES = [
-    "topic_score", "level", "appropriate_level", "level_gap", "abs_level_gap",
-    "format_match", "is_video", "is_reading", "is_practice", "duration_min",
-    "mean_topic_score", "engagement_index",
-]
-RELEVANT_RATING = 4
-TOP_K = 5
+HORIZON_DAYS = 60
+TOP_K = 10
+MIN_ITEM_USERS = 10      # drop sites visited by fewer than this many students
+MIN_TRAIN_ITEMS = 3
 
 
-# ----------------------------------------------------------------- features
-def pair_features(students, resources, s_idx, r_idx):
-    """Feature frame for the (students[s_idx], resources[r_idx]) pairs.
+class PresentationData:
+    """Binary user x item matrices for one module presentation."""
 
-    `students` must already be passed through preprocessing.prepare().
-    """
-    s_idx, r_idx = np.asarray(s_idx), np.asarray(r_idx)
-    topic_pos = resources["topic"].map({t: i for i, t in enumerate(TOPICS)}).to_numpy()
-    scores = students[TOPIC_COLS].to_numpy(dtype=float)
-    mean_score = students["mean_topic_score"].fillna(60.0).to_numpy()
-    topic_score = scores[s_idx, topic_pos[r_idx]]
-    topic_score = np.where(np.isnan(topic_score), mean_score[s_idx], topic_score)
-
-    level = resources["level"].to_numpy()[r_idx]
-    appropriate = np.where(topic_score < BEGINNER_MAX, 1, np.where(topic_score < ADVANCED_MIN, 2, 3))
-    rtype = resources["rtype"].to_numpy()[r_idx]
-    preferred = students["preferred_format"].to_numpy()[s_idx]
-    return pd.DataFrame({
-        "topic_score": topic_score,
-        "level": level,
-        "appropriate_level": appropriate,
-        "level_gap": level - appropriate,
-        "abs_level_gap": np.abs(level - appropriate),
-        "format_match": (rtype == preferred).astype(int),
-        "is_video": (rtype == "video").astype(int),
-        "is_reading": (rtype == "reading").astype(int),
-        "is_practice": (rtype == "practice").astype(int),
-        "duration_min": resources["duration_min"].to_numpy()[r_idx],
-        "mean_topic_score": mean_score[s_idx],
-        "engagement_index": students["engagement_index"].fillna(0.6).to_numpy()[s_idx],
-    })[PAIR_FEATURES]
+    def __init__(self, keys, items, X_train, X_test):
+        self.keys, self.items = np.asarray(keys), np.asarray(items)
+        self.X_train, self.X_test = X_train.tocsr(), X_test.tocsr()
 
 
-# ---------------------------------------------------------------- split/mats
-def split_ratings(ratings, test_frac=0.2, seed=SEED):
-    test = ratings.groupby("student_id", group_keys=False).sample(frac=test_frac, random_state=seed)
-    return ratings.drop(test.index), test
+def build_presentation_data(visits, enrol, cutoff=CUTOFF_DAY, horizon=HORIZON_DAYS):
+    """visits: (key, id_site, first_date); enrol: DataFrame with key, code_module, code_presentation."""
+    out = {}
+    v_all = visits.merge(enrol[["key", "code_module", "code_presentation"]], on="key", how="inner")
+    for (mod, pres), grp in v_all.groupby(["code_module", "code_presentation"]):
+        keys = grp["key"].unique()
+        item_users = grp.groupby("id_site")["key"].nunique()
+        items = item_users[item_users >= MIN_ITEM_USERS].index.to_numpy()
+        if len(items) < 30 or len(keys) < 100:
+            continue
+        kpos = pd.Series(np.arange(len(keys)), index=keys)
+        ipos = pd.Series(np.arange(len(items)), index=items)
+        g = grp[grp["id_site"].isin(items)]
+        u, i = kpos[g["key"]].to_numpy(), ipos[g["id_site"]].to_numpy()
+        train = g["first_date"].to_numpy() <= cutoff
+        test = (g["first_date"].to_numpy() > cutoff) & (g["first_date"].to_numpy() <= cutoff + horizon)
+        shape = (len(keys), len(items))
+        out[(mod, pres)] = PresentationData(
+            keys, items,
+            sp.csr_matrix((np.ones(train.sum()), (u[train], i[train])), shape=shape),
+            sp.csr_matrix((np.ones(test.sum()), (u[test], i[test])), shape=shape))
+    return out
 
 
-def to_matrix(ratings, students, resources):
-    s_pos = {s: i for i, s in enumerate(students["student_id"])}
-    r_pos = {r: i for i, r in enumerate(resources["resource_id"])}
-    si = ratings["student_id"].map(s_pos).to_numpy()
-    ri = ratings["resource_id"].map(r_pos).to_numpy()
-    mat = np.full((len(s_pos), len(r_pos)), np.nan)
-    mat[si, ri] = ratings["rating"].to_numpy()
-    return mat, si, ri
+# ----------------------------------------------------------------- scorers
+def _popularity(X):
+    return np.asarray(X.sum(axis=0)).ravel()
 
 
-# --------------------------------------------------------------- the models
-def fit_bias_model(train_mat, shrink=10.0):
-    mask = ~np.isnan(train_mat)
-    mu = np.nanmean(train_mat)
-    resid = np.where(mask, train_mat - mu, 0.0)
-    b_i = resid.sum(0) / (mask.sum(0) + shrink)
-    resid_u = np.where(mask, train_mat - mu - b_i[None, :], 0.0)
-    b_u = resid_u.sum(1) / (mask.sum(1) + shrink)
-    return mu, b_i, b_u
+def _item_knn_similarity(X):
+    X = X.astype(float)
+    norms = np.sqrt(np.asarray(X.multiply(X).sum(axis=0)).ravel()) + 1e-9
+    S = (X.T @ X).toarray() / np.outer(norms, norms)
+    np.fill_diagonal(S, 0.0)
+    return S
 
 
-def svd_complete(residual, mask, k=6, iters=30):
-    """Soft-impute style low-rank completion of the residual matrix."""
-    X = np.where(mask, residual, 0.0)
-    low = np.zeros_like(X)
-    for _ in range(iters):
-        U, s, Vt = np.linalg.svd(X, full_matrices=False)
-        low = (U[:, :k] * s[:k]) @ Vt[:k]
-        X = np.where(mask, residual, low)
-    return low
+def score_item_knn(X, S):
+    return np.asarray(X @ S)
 
 
-def fit_predict_cf(train_mat, k=6):
-    mu, b_i, b_u = fit_bias_model(train_mat)
-    base = mu + b_u[:, None] + b_i[None, :]
-    mask = ~np.isnan(train_mat)
-    low = svd_complete(np.where(mask, train_mat - base, 0.0), mask, k=k)
-    return base, base + low
+def score_svd(X, k=20):
+    k = min(k, X.shape[1] - 1, X.shape[0] - 1)
+    svd = TruncatedSVD(n_components=k, random_state=SEED)
+    U = svd.fit_transform(X)
+    return U @ svd.components_
 
 
-def fit_content_model(students, resources, train_df, students_ids):
-    s_pos = {s: i for i, s in enumerate(students_ids)}
-    r_pos = {r: i for i, r in enumerate(resources["resource_id"])}
-    si = train_df["student_id"].map(s_pos).to_numpy()
-    ri = train_df["resource_id"].map(r_pos).to_numpy()
-    X = pair_features(students, resources, si, ri)
-    model = GradientBoostingRegressor(n_estimators=200, max_depth=3, learning_rate=0.08,
-                                      subsample=0.8, random_state=SEED)
-    return model.fit(X, train_df["rating"].to_numpy())
+def score_persona_popularity(X, persona):
+    """Popularity inside each persona (share of persona members who visited the site)."""
+    scores = np.zeros(X.shape, dtype=float)
+    for p in np.unique(persona):
+        m = persona == p
+        scores[m] = np.asarray(X[m].mean(axis=0)).ravel()
+    return scores
 
 
-def predict_content_matrix(model, students, resources):
-    n_s, n_r = len(students), len(resources)
-    s_idx = np.repeat(np.arange(n_s), n_r)
-    r_idx = np.tile(np.arange(n_r), n_s)
-    pred = model.predict(pair_features(students, resources, s_idx, r_idx))
-    return np.clip(pred, 1, 5).reshape(n_s, n_r)
+def _rownorm(S):
+    lo, hi = S.min(axis=1, keepdims=True), S.max(axis=1, keepdims=True)
+    return (S - lo) / np.maximum(hi - lo, 1e-9)
 
 
-# --------------------------------------------------------------- evaluation
-def rating_errors(pred, test_mat):
-    m = ~np.isnan(test_mat)
-    d = np.clip(pred, 1, 5)[m] - test_mat[m]
-    return float(np.sqrt(np.mean(d ** 2))), float(np.mean(np.abs(d)))
+def all_scores(X, persona, rng):
+    S = _item_knn_similarity(X)
+    knn = score_item_knn(X, S)
+    pers = score_persona_popularity(X, persona)
+    return {
+        "Random": rng.random(X.shape),
+        "Popularity": np.tile(_popularity(X), (X.shape[0], 1)).astype(float),
+        "Persona popularity": pers,
+        "Item-kNN (cosine)": knn,
+        "SVD (k=20)": score_svd(X),
+        "Hybrid (kNN + persona)": 0.5 * _rownorm(knn) + 0.5 * _rownorm(pers),
+    }, S
 
 
-def ranking_metrics(score, train_mask, test_mat, k=TOP_K):
-    rel = (~np.isnan(test_mat)) & (np.nan_to_num(test_mat) >= RELEVANT_RATING)
-    s = np.where(train_mask, -np.inf, score)          # never recommend already-seen items
+# ---------------------------------------------------------------- metrics
+def ranking_metrics(scores, X_train, X_test, k=TOP_K):
+    s = np.where(X_train.toarray() > 0, -np.inf, scores)
+    rel = X_test.toarray() > 0
+    ok = rel.sum(axis=1) > 0
     top = np.argsort(-s, axis=1, kind="stable")[:, :k]
     hits = np.take_along_axis(rel, top, axis=1)
-    n_rel = rel.sum(1)
-    ok = n_rel > 0
-    discount = 1 / np.log2(np.arange(2, k + 2))
-    dcg = (hits * discount).sum(1)
-    idcg = np.array([discount[:min(n, k)].sum() for n in n_rel])
+    n_rel = rel.sum(axis=1)
+    disc = 1 / np.log2(np.arange(2, k + 2))
+    dcg = (hits * disc).sum(axis=1)
+    idcg = np.array([disc[:min(n, k)].sum() for n in n_rel])
     return {
-        f"precision@{k}": float((hits.sum(1) / k)[ok].mean()),
-        f"recall@{k}": float((hits.sum(1) / np.maximum(n_rel, 1))[ok].mean()),
+        f"precision@{k}": float((hits.sum(axis=1) / k)[ok].mean()),
+        f"recall@{k}": float((hits.sum(axis=1) / np.maximum(n_rel, 1))[ok].mean()),
         f"ndcg@{k}": float((dcg / np.maximum(idcg, 1e-9))[ok].mean()),
-        f"hit_rate@{k}": float(hits.any(1)[ok].mean()),
+        f"hit_rate@{k}": float(hits.any(axis=1)[ok].mean()),
+        "coverage": float(len(np.unique(top)) / scores.shape[1]),
+        "n_users": int(ok.sum()),
     }
 
 
-def run_recommender(students, resources, ratings, seed=SEED):
-    """`students` must be prepared (preprocessing.prepare)."""
-    train_df, test_df = split_ratings(ratings, seed=seed)
-    train_mat, _, _ = to_matrix(train_df, students, resources)
-    test_mat, _, _ = to_matrix(test_df, students, resources)
-    train_mask = ~np.isnan(train_mat)
-
+def run_recommender(visits, enrol, personas_by_key, seed=SEED):
+    """Evaluate every model on every presentation; returns macro-averaged table."""
     rng = np.random.default_rng(seed)
-    mu, b_i, _ = fit_bias_model(train_mat)
-    scores = {
-        "Random": rng.random(train_mat.shape) * 4 + 1,
-        "Popularity (item mean)": np.tile(mu + b_i, (len(students), 1)),
-    }
-    bias_pred, cf_pred = fit_predict_cf(train_mat)
-    scores["User+item bias"] = bias_pred
-    scores["Collaborative (SVD)"] = cf_pred
+    data = build_presentation_data(visits, enrol)
+    per_pres, artifacts = [], {}
+    for (mod, pres), d in data.items():
+        has_train = np.asarray(d.X_train.sum(axis=1)).ravel() >= MIN_TRAIN_ITEMS
+        has_rel = np.asarray(d.X_test.sum(axis=1)).ravel() > 0
+        persona = pd.Series(d.keys).map(personas_by_key).fillna(-1).to_numpy()
+        scores, S = all_scores(d.X_train, persona, rng)
+        for name, sc in scores.items():
+            rows = np.where(has_train)[0]
+            m = ranking_metrics(sc[rows], d.X_train[rows], d.X_test[rows])
+            per_pres.append({"module": mod, "presentation": pres, "model": name, **m})
+        artifacts[f"{mod}_{pres}"] = {"keys": d.keys, "items": d.items, "X_train": d.X_train,
+                                      "S": S.astype(np.float32), "persona": persona}
+    per = pd.DataFrame(per_pres)
+    metric_cols = [c for c in per.columns if c not in ("module", "presentation", "model", "n_users")]
+    table = (per.groupby("model", sort=False)[metric_cols].mean()
+             .assign(n_presentations=len(data)).reset_index())
+    return {"table": table, "per_presentation": per, "artifacts": artifacts,
+            "n_presentations": len(data)}
 
-    content = fit_content_model(students, resources, train_df, students["student_id"])
-    content_pred = predict_content_matrix(content, students, resources)
-    scores["Content-based (GBM)"] = content_pred
-    scores["Hybrid (0.5 SVD + 0.5 content)"] = 0.5 * cf_pred + 0.5 * content_pred
 
-    rows = []
-    for name, mat in scores.items():
-        rmse, mae = rating_errors(mat, test_mat)
-        rows.append({"model": name, "rmse": rmse, "mae": mae,
-                     **ranking_metrics(mat, train_mask, test_mat)})
-    table = pd.DataFrame(rows)
-
-    sweep = []
-    for a in np.linspace(0, 1, 5):  # sensitivity analysis only; alpha is not tuned on test
-        mat = a * cf_pred + (1 - a) * content_pred
-        rmse, _ = rating_errors(mat, test_mat)
-        sweep.append({"alpha_cf": a, "rmse": rmse, **ranking_metrics(mat, train_mask, test_mat)})
-
-    # Final production model: content model refit on all ratings (it needs no user id,
-    # so it also serves brand-new students -> solves the cold-start problem).
-    content_full = fit_content_model(students, resources, ratings, students["student_id"])
-    return {"table": table, "alpha_sweep": pd.DataFrame(sweep), "content_model": content_full,
-            "n_train": len(train_df), "n_test": len(test_df),
-            "density": float(train_mask.mean())}
+# ----------------------------------------------------------- serving
+def recommend_for(artifact, key, site_catalogue, top_k=5, persona=None):
+    """Top-k unseen sites for an enrolment key using the hybrid scorer."""
+    keys = artifact["keys"]
+    idx = np.where(keys == key)[0]
+    if len(idx) == 0:
+        return pd.DataFrame(columns=["id_site", "activity_type", "week_from", "score"])
+    u = idx[0]
+    x = artifact["X_train"][u]
+    seen = x.toarray().ravel() > 0
+    knn = np.asarray(x @ artifact["S"]).ravel()
+    p = persona if persona is not None else artifact["persona"][u]
+    same = artifact["persona"] == p
+    pers = np.asarray(artifact["X_train"][same].mean(axis=0)).ravel()
+    def norm(v):
+        return (v - v.min()) / max(v.max() - v.min(), 1e-9)
+    score = 0.5 * norm(knn) + 0.5 * norm(pers)
+    score[seen] = -np.inf
+    top = np.argsort(-score)[:top_k]
+    cat = site_catalogue.set_index("id_site")
+    out = pd.DataFrame({"id_site": artifact["items"][top], "score": score[top]})
+    out["activity_type"] = out["id_site"].map(cat["activity_type"])
+    out["week_from"] = out["id_site"].map(cat["week_from"])
+    return out

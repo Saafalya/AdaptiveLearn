@@ -1,45 +1,48 @@
 {
   "dataset": {
-    "n_students": 1500,
-    "n_resources": 54,
-    "n_ratings": 22500,
-    "rating_density": 0.2777777777777778,
-    "n_raw_columns": 19,
-    "n_model_features": 22,
-    "level_distribution": {
-      "intermediate": 0.539,
-      "beginner": 0.263,
-      "advanced": 0.197
+    "n_enrolments_total": 32593,
+    "n_students_total": 28785,
+    "n_click_rows_raw": 10655280,
+    "cutoff_day": 90,
+    "n_enrolments_at_cutoff": 25562,
+    "n_students_at_cutoff": 23398,
+    "n_features": 34,
+    "outcome_distribution": {
+      "Pass": 0.484,
+      "Fail": 0.276,
+      "Withdrawn": 0.123,
+      "Distinction": 0.118
     },
     "missing_pct": {
-      "score_python": 5.87,
-      "score_sql": 5.47,
-      "score_statistics": 5.27,
-      "score_linalg": 7.0,
-      "score_dsa": 5.73,
-      "score_ml": 6.47,
-      "weekly_study_hours": 0.0,
-      "logins_per_week": 2.87,
-      "avg_session_min": 3.13,
-      "assignments_completed_pct": 0.0,
-      "quiz_attempts": 2.07,
-      "forum_posts": 0.0,
-      "days_since_last_active": 0.0,
-      "prior_cgpa": 4.6
+      "date_registration": 0.03,
+      "share_homepage": 1.96,
+      "share_content": 1.96,
+      "share_forum": 1.96,
+      "share_quiz": 1.96,
+      "share_other": 1.96,
+      "mean_score_early": 6.88,
+      "min_score_early": 6.88,
+      "mean_days_early": 6.85,
+      "future_mean_score": 19.77
     },
-    "study_hours_over_60": 15
+    "regression_target_available_pct": 80.23237618339722,
+    "train": 20449,
+    "test": 5113,
+    "students_in_both_splits": 0
   },
   "clustering": {
-    "k": 3,
-    "stability_ari": 0.9668540255965618,
+    "k": 5,
+    "stability_ari": 0.7511780436641232,
     "personas": {
-      "0": "High achievers",
-      "1": "At-risk learners",
-      "2": "Steady learners"
+      "0": "Discussion-driven learners",
+      "1": "Engaged high performers",
+      "2": "Disengaged / at-risk",
+      "3": "Steady learners",
+      "4": "Low-score, moderate effort"
     },
     "pca_explained_variance": [
-      0.543082603292193,
-      0.11965832424364191
+      0.3796915899055751,
+      0.1365689546407276
     ]
   },
   "classification": {
@@ -47,40 +50,37 @@
     "best_params": {
       "Random Forest (tuned)": {
         "model__max_depth": "None",
-        "model__min_samples_leaf": 1,
-        "model__n_estimators": 200
+        "model__min_samples_leaf": "8",
+        "model__n_estimators": "400"
       },
-      "Gradient Boosting (tuned)": {
-        "model__learning_rate": 0.05,
-        "model__max_depth": 2,
-        "model__n_estimators": 100
+      "Hist. Gradient Boosting (tuned)": {
+        "model__l2_regularization": "1.0",
+        "model__learning_rate": "0.06",
+        "model__max_depth": "None"
       }
     },
-    "cv_f1_macro": 0.8136871728178228,
-    "cv_f1_std": 0.022836057647524898,
-    "cv_accuracy": null,
-    "test_accuracy": 0.82,
-    "test_precision_macro": 0.8257530172562854,
-    "test_recall_macro": 0.7975579694214227,
-    "test_f1_macro": 0.8092090584560463,
-    "test_roc_auc_ovr": 0.9438770346906269
+    "cv_f1_macro": 0.5070027443318841,
+    "cv_f1_std": 0.0037728907469674385,
+    "test_accuracy": 0.5728535106591043,
+    "test_precision_macro": 0.50215510590591,
+    "test_recall_macro": 0.5226441444567419,
+    "test_f1_macro": 0.5037894282551004,
+    "test_roc_auc_ovr": 0.8012033454741011,
+    "test_at_risk_auc": 0.8578063176121971,
+    "test_at_risk_ap": 0.8338086526099447
   },
   "regression": {
-    "selected_model": "Lasso",
-    "cv_rmse": 4.634300851405412,
-    "cv_rmse_std": 0.09547270710107922,
-    "cv_r2": 0.8753059545802815,
-    "test_rmse": 4.368057095841422,
-    "test_mae": 3.4833108682277496,
-    "test_r2": 0.8763870813775726
+    "selected_model": "Hist. Gradient Boosting",
+    "n_train": 16429,
+    "n_test": 4080,
+    "cv_rmse": 11.392986174275137,
+    "cv_rmse_std": 0.12888420704883866,
+    "cv_r2": 0.5174605707072738,
+    "test_rmse": 11.028146763062418,
+    "test_mae": 8.27000896111743,
+    "test_r2": 0.5482581766002917
   },
   "recommender": {
-    "n_train_ratings": 18000,
-    "n_test_ratings": 4500,
-    "train_density": 0.2222222222222222
-  },
-  "split": {
-    "train": 1200,
-    "test": 300
+    "n_presentations": 22
   }
 }

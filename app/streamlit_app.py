@@ -1,4 +1,5 @@
-"""Interactive demo:  streamlit run app/streamlit_app.py   (run `python run_all.py` first)."""
+"""Instructor / student dashboard:  streamlit run app/streamlit_app.py
+(run `python run_all.py` first - it trains the models this app loads)."""
 import sys
 from pathlib import Path
 
@@ -8,8 +9,8 @@ sys.path.insert(0, str(ROOT / "src"))
 import pandas as pd  # noqa: E402
 import streamlit as st  # noqa: E402
 
-from adaptivelearn.config import MODEL_DIR, TOPICS  # noqa: E402
-from adaptivelearn.inference import load_artifacts, profile_student  # noqa: E402
+from adaptivelearn.config import MODEL_DIR  # noqa: E402
+from adaptivelearn.inference import load_artifacts, profile  # noqa: E402
 
 st.set_page_config(page_title="AdaptiveLearn", page_icon="🎓", layout="wide")
 
@@ -20,53 +21,63 @@ def artifacts():
 
 
 st.title("🎓 AdaptiveLearn")
-st.caption("ML-based personalised learning recommendations from student performance analytics")
+st.caption("Early-warning and personalised study plans from the Open University Learning Analytics "
+           "Dataset (OULAD, real anonymised data) - predictions use only the first 90 days of a course")
 
 if not (MODEL_DIR / "classifier.joblib").exists():
     st.error("Trained models not found. Run `python run_all.py` first.")
     st.stop()
 
+art = artifacts()
+df = art["enrolments"]
+test = df[df.split == "test"]          # students the models have never seen
+
 with st.sidebar:
-    st.header("Topic scores (%)")
-    raw = {}
-    for key, name in TOPICS.items():
-        attempted = st.checkbox(f"{name} attempted", value=True, key=f"att_{key}")
-        raw[f"score_{key}"] = st.slider(name, 0, 100, 60, key=f"s_{key}") if attempted else None
-    st.header("Behaviour & context")
-    raw.update({
-        "weekly_study_hours": st.slider("Study hours / week", 0.0, 40.0, 8.0),
-        "logins_per_week": st.slider("Logins / week", 0, 21, 5),
-        "avg_session_min": st.slider("Avg session (min)", 5, 120, 35),
-        "assignments_completed_pct": st.slider("Assignments completed (%)", 0, 100, 70),
-        "quiz_attempts": st.slider("Quiz attempts", 0, 30, 6),
-        "forum_posts": st.slider("Forum posts", 0, 20, 2),
-        "days_since_last_active": st.slider("Days since last active", 0, 60, 3),
-        "prior_cgpa": st.slider("Prior CGPA (0-10)", 3.0, 10.0, 6.8),
-        "internet_access": st.selectbox("Internet access", ["limited", "moderate", "good"], index=1),
-        "preferred_format": st.selectbox("Preferred format", ["video", "reading", "practice"]),
-    })
+    st.header("Pick a real (held-out) student")
+    module = st.selectbox("Module", sorted(test.code_module.unique()))
+    pres = st.selectbox("Presentation", sorted(test[test.code_module == module].code_presentation.unique()))
+    pool = test[(test.code_module == module) & (test.code_presentation == pres)].reset_index(drop=True)
+    idx = st.number_input(f"Student # (0 – {len(pool) - 1})", 0, len(pool) - 1, 0)
+    base = pool.iloc[int(idx)].copy()
 
-out = profile_student(raw, artifacts())
+    st.header("What-if: change their behaviour")
+    row = base.copy()
+    row["total_clicks"] = st.slider("Total clicks by day 90", 0, 6000, int(min(base.total_clicks, 6000)))
+    row["active_days"] = st.slider("Active days", 0, 90, int(min(base.active_days, 90)))
+    row["clicks_last_14d"] = st.slider("Clicks in last 14 days", 0, 1500,
+                                       int(min(base.clicks_last_14d, 1500)))
+    row["days_since_last_active"] = st.slider("Days since last active", 0, 90,
+                                              int(min(base.days_since_last_active, 90)))
+    row["n_submitted"] = st.slider("Assessments submitted", 0, 6, int(min(base.n_submitted, 6)))
+    default_score = 0 if pd.isna(base.mean_score_early) else int(base.mean_score_early)
+    row["mean_score_early"] = st.slider("Mean score so far (%)", 0, 100, default_score)
+    row["clicks_per_active_day"] = row["total_clicks"] / max(row["active_days"], 1)
 
-c1, c2, c3 = st.columns(3)
-c1.metric("Predicted level", out["level"].title())
-c2.metric("Predicted final score", f"{out['predicted_score']:.1f} %")
-c3.metric("Learner persona", out["persona"])
+out = profile(row, art)
+plan = out["plan"]
 
-st.progress(float(out["level_proba"].get(out["level"], 0)),
-            text=" · ".join(f"{k}: {v:.0%}" for k, v in out["level_proba"].items()))
+c1, c2, c3, c4 = st.columns(4)
+c1.metric("Predicted outcome", out["predicted_result"])
+c2.metric("Risk of Fail / Withdrawal", f"{out['at_risk']:.0%}", plan["risk"], delta_color="inverse")
+c3.metric("Predicted future score",
+          f"{out['predicted_score']:.0f} %", plan["tier"])
+c4.metric("Persona", out["persona"])
+st.caption(f"Recorded real outcome of this student: **{base.final_result}** "
+           f"(shown for transparency; the models never saw it).")
 
-left, right = st.columns([1, 1.4])
+st.bar_chart(pd.Series(out["proba"]).reindex(["Distinction", "Pass", "Fail", "Withdrawn"]))
+
+left, right = st.columns([1, 1.5])
 with left:
-    st.subheader("Top recommended resources")
-    st.dataframe(out["top_resources"].assign(predicted_rating=lambda d: d.predicted_rating.round(2)),
-                 hide_index=True, width="stretch")
-with right:
-    st.subheader("Personalised learning path")
-    if out["learning_path"]:
-        st.dataframe(pd.DataFrame(out["learning_path"])[["topic", "action", "resource", "minutes", "why"]],
-                     hide_index=True, width="stretch")
+    st.subheader("Recommended next resources")
+    recs = out["recommendations"]
+    if len(recs):
+        st.dataframe(recs[["activity_type", "week_from", "id_site"]].rename(
+            columns={"activity_type": "type", "week_from": "from week", "id_site": "site id"}),
+            hide_index=True, width="stretch")
     else:
-        st.info("No topic is below the remediation threshold (60%) and none is mastered (≥ 75%) - "
-                "keep going with the recommended resources on the left.")
-    st.caption("Checkpoint rule: score ≥ 75% → advance to the next tier, otherwise repeat practice.")
+        st.info("No recommender available for this presentation.")
+with right:
+    st.subheader("Personalised study plan")
+    st.dataframe(pd.DataFrame(plan["steps"])[["when", "action", "detail", "why"]],
+                 hide_index=True, width="stretch")

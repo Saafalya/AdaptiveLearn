@@ -1,0 +1,6 @@
+cluster,persona,size,total_clicks,active_days,n_sites,n_submitted,submission_rate,mean_score_early,days_since_last_active,share_forum,future_mean_score
+0,Discussion-driven learners,5213,480.0,35.0,34.0,3.0,1.0,80.37,1.0,0.43,79.4
+1,Engaged high performers,8649,997.0,47.0,67.0,2.0,1.0,82.0,1.0,0.19,78.9
+2,Disengaged / at-risk,1939,13.0,2.0,4.0,0.0,0.0,65.0,78.0,0.0,72.5
+3,Steady learners,3060,397.5,23.0,29.0,3.0,1.0,78.0,7.0,0.05,73.25
+4,"Low-score, moderate effort",6701,209.0,16.0,25.0,2.0,1.0,69.29,15.0,0.1,72.0

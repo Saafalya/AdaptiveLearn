@@ -1,39 +1,45 @@
 # Viva preparation – likely questions
 
-**Why is the dataset synthetic? Isn't that a weakness?**
-No public dataset has per-topic scores, behaviour logs *and* resource feedback together. A seeded simulator lets us control and document ground truth, inject realistic missingness/outliers, and check that the pipeline recovers known structure. The weakness is real: absolute numbers don't transfer to real learners. The loader accepts the same column names, so real LMS data can be dropped in.
+**Where does the data come from? Is it real?**
+Yes — OULAD, the Open University Learning Analytics Dataset (Kuzilek et al., *Scientific Data*, 2017), anonymised, CC BY 4.0: 32,593 course enrolments by 28,785 students and 10.6 million click records. We downloaded it from the authors' Figshare record and verified the MD5.
 
-**Why macro-F1 rather than accuracy?**
-Classes are imbalanced (54 / 26 / 20 %). The majority-class baseline already gets 0.54 accuracy but only 0.23 macro-F1, so accuracy would flatter weak models.
+**What exactly are you predicting, and from what?**
+The final result (Distinction/Pass/Fail/Withdrawn) and the mean score on assessments due *after* day 90, using only activity and assessment data up to day 90.
 
-**How did you avoid data leakage?**
-Imputers, scalers and encoders live inside sklearn `Pipeline`s fitted on training folds only; engineered features are row-wise; the final score and level are never model inputs; the model was selected by 5-fold CV on the training set, not on the test set.
+**How did you avoid leakage?**
+(1) Features use only data up to the cut-off day; targets are in the future. (2) Students who had already unregistered by day 90 are excluded. (3) Imputers/scalers/encoders are inside pipelines fitted per CV fold. (4) Splits are *grouped by student* because 3,538 students enrolled in more than one presentation. (5) The model is chosen by CV, not by the test set.
 
-**Random Forest vs Gradient Boosting vs Logistic Regression – which is "best"?**
-Top models are within one CV standard deviation (0.80–0.81 macro-F1), so differences are not significant. We chose Random Forest (tuned) on CV score. Logistic Regression is nearly as good and far more interpretable — a valid production choice.
+**Why is accuracy only 57 %? Isn't that bad?**
+Four classes, one of them (Withdrawn) driven by life events that clicks can't show. Baseline macro-F1 is 0.16, we get 0.50. For the practical question — "is this student at risk?" — ROC-AUC is 0.86 and average precision 0.83 (baseline 0.40).
 
-**Why did linear models win for regression?**
-The simulator builds the score as a noisy linear combination of the inputs; extra capacity can't help. On real data we'd expect more of a gap for ensembles.
+**Why macro-F1?**
+Classes are imbalanced (Withdrawn 12 %); accuracy rewards ignoring minority classes. KNN even has 0.60 accuracy but only 0.38 macro-F1.
 
-**Why did SVD collaborative filtering lose to popularity?**
-Only 15 ratings per student (28 % density) and ratings are driven by the match between mastery and resource difficulty — a feature-level effect, not a latent-taste effect. Content features capture it directly; the low-rank structure SVD needs is mostly absent.
+**Which features matter most?**
+Early assessment scores and submission rate; then module and engagement. Demographics alone give at-risk AUC 0.65, so they add little — good, because they are the ethically sensitive ones.
 
-**What about a new student with no history (cold start)?**
-The content-based model uses student features, not a user id, so it works immediately; SVD cannot.
+**How early can you warn?**
+At course start AUC is 0.72; at day 30 it is 0.80; at day 90 it is 0.86. We use day 90 as a trade-off with ~170 days left to act.
 
-**Silhouette is only 0.19 – is clustering meaningless?**
-No – it means the population is a continuum. The clusters are still stable (ARI 0.97), interpretable, and align with level, so they are useful *segments*. We also report k = 2 had a higher silhouette (0.28) but gives only "good/bad", which is not actionable; we restricted k to 3–6 and say so.
+**Silhouette is 0.19 — is clustering meaningless?**
+It means behaviour is a continuum. But the personas are stable (ARI 0.75) and *validated on outcomes the clustering never saw*: the disengaged persona fails/withdraws 92 % of the time. k was restricted to 3–6 because k = 2 (silhouette 0.35) only splits active from inactive.
 
-**How is the learning path produced – is it ML or rules?**
-Hybrid. ML predicts level, topic-fit ratings and persona; a transparent rule layer (thresholds, prerequisite graph, checkpoint-advance rule) turns that into an ordered path. Rules keep it explainable to students and teachers.
+**The recommender barely beats popularity — why?**
+Course sites unlock on a schedule, so what a student opens next is mostly determined by time, not taste. All models beat random (precision 0.150 vs 0.096). SVD has the best hit-rate (0.72 vs 0.67). We deploy the kNN + persona hybrid because it is explainable. A schedule-aware model is the obvious next step.
 
-**How does this support SDG 10?**
-Fairness slice by internet access; format-aware recommendations (practice/reading are lighter than video); the same model quality across access groups (0.79–0.85 macro-F1; small n for "limited").
+**How do you know the study plan helps students?**
+We don't — that needs a live pilot/A-B test; offline data can't show learning gain. The plan is a transparent rule layer over ML outputs and the module's real assessment calendar.
 
-**How would you evaluate it in the real world?**
-A/B test: path-followers vs control, measuring learning gain (post – pre score), completion and retention; monitor fairness metrics continuously.
+**What does the fairness audit show?**
+Recall is similar across gender and disability and higher for the most deprived students (0.73), so they are not missed. But false alarms are higher for the most deprived (22 % vs 9 %) and lower-education students. So flags must only *offer* support, never restrict.
 
-**What would you improve next?**
-Knowledge tracing (BKT/DKT) for time-aware mastery, bandits for online learning from feedback, SHAP explanations, real LMS data.
+**Ethical concerns?**
+Labelling students as "at-risk" can stigmatise them; demographic variables can encode inequality; data are anonymised and must not be re-identified. Predictions go to tutors to offer help, not to grade.
 
-**Know your numbers:** 1,500 students · 22 features · 54 resources · 22,500 ratings · RF macro-F1 0.809 / AUC 0.944 · Lasso RMSE 4.37, R² 0.876 · k = 3, ARI 0.97 · Content GBM RMSE 0.705 vs popularity 0.998.
+**Why Random Forest / why not deep learning?**
+Tabular data of ~20k rows: tree ensembles are typically as good as or better than deep nets, train in minutes and are explainable. Top four models differ by ≈ 0.01 macro-F1 — the limit is the information in the data.
+
+**What would you do next?**
+Pilot with tutors, survival models for time-to-withdrawal, weekly-sequence models, schedule-aware recommenders, SHAP explanations, per-group threshold calibration.
+
+**Know your numbers:** 25,562 enrolments at day 90 · 34 features · RF tuned macro-F1 0.504 / at-risk AUC 0.858 · HGB regression RMSE 11.0, R² 0.55 · k = 5, ARI 0.75 · recommender hit-rate@10 SVD 0.72 vs popularity 0.67 vs random 0.55.
