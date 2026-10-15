@@ -1,7 +1,7 @@
 # AI-Based Personalized Learning Recommendation System Using Machine Learning
 
 **AUCML Lab – ESE Case Study Project (TE7483)** · Department of AIML · Batch 2024-28
-**Team:** Swastik Gavhane (PRN 24070126224), Aryan Gawande (PRN 24070126223), Saafalya Sengupta (PRN 24070126158), _<Member 4 – name, PRN>_ · **Division:** _<div>_
+**Team:** Swastik Gavhane (PRN 24070126224), Aryan Gawande (PRN 24070126223), Saafalya Sengupta (PRN 24070126158), _<Member 4 – name, PRN>_ · **Division:** C
 **Application domain:** Education · **SDGs:** SDG 4 (Quality Education), SDG 10 (Reduced Inequalities)
 
 > All numbers below are produced by `python run_all.py` (seed 42) and are stored in `results/metrics.json` and `results/tables/`.
