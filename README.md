@@ -50,4 +50,9 @@ tests/               unit tests
 The dataset is **synthetic** (documented simulator in `data_generation.py`) because no public dataset combines per-topic scores, behaviour logs and resource feedback. Metrics therefore show that the pipeline recovers a known process, not real-world learning gains. To use real data, supply `data/students.csv`, `resources.csv` and `ratings.csv` with the same columns.
 
 ## Team
-_<names / PRNs / division>_
+- Swastik Gavhane – 24070126224
+- Aryan Gawande – 24070126223
+- Saafalya Sengupta – 24070126158
+- _<Member 4 – name, PRN>_
+
+Division: _<div>_
