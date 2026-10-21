@@ -10,3 +10,4 @@ results/models/*.joblib
 data/oulad_raw/
 data/oulad_zip/
 results/run_log.txt
+reports/predictive-maintenance/results_log.txt
