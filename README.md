@@ -25,6 +25,8 @@ python -m unittest discover -s tests   # fast sanity tests (no data needed)
 streamlit run app/streamlit_app.py     # interactive demo
 ```
 
+No raw data? `python train_from_processed.py` trains the classifier, regressor and personas from the committed `data/processed/` table (about 20 min on 2 cores, or `--quick`), then `streamlit run app/streamlit_app.py` works. The resource recommender still needs the raw click logs and `run_all.py`.
+
 ## Results at a glance (seed 42, held-out students)
 
 | Task | Best model | Score | Baseline |
