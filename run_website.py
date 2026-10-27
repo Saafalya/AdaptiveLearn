@@ -50,10 +50,15 @@ def install_packages():
         return
     say("1/3", f"Installing {', '.join(missing)} (first run takes a few minutes)...")
     # no -q: pip's own download progress shows, so a slow connection doesn't look like a freeze
+    # --prefer-binary: take ready-made wheels, never a source archive that needs a C compiler
+    # --timeout/--retries: survive slow or flaky connections (VPNs such as Cloudflare WARP)
     result = subprocess.run([sys.executable, "-m", "pip", "install", "--progress-bar", "on",
-                             "--prefer-binary", "-r", str(ROOT / "requirements.txt")])
+                             "--prefer-binary", "--only-binary", "numpy,scipy,pandas,scikit-learn,matplotlib",
+                             "--timeout", "60", "--retries", "10",
+                             "-r", str(ROOT / "requirements.txt")])
     if result.returncode != 0:
-        sys.exit("[X] Package install failed. Check your internet connection and try again.")
+        sys.exit("[X] Package install failed. Check your internet connection (a VPN can slow "
+                 "downloads a lot), then run start.bat again. It picks up where it stopped.")
 
 
 def models_ready():
