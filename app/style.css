@@ -117,7 +117,7 @@ section[data-testid="stSidebar"] .al-side-note {
 .al-word {
   margin: 22px 0 0; line-height: 0.86; color: var(--ink);
   font-family: var(--display); font-weight: 900; letter-spacing: -0.055em;
-  font-size: clamp(2.4rem, 12.4cqw, 10.5rem);
+  font-size: clamp(2rem, 11.6cqw, 10rem);
   white-space: nowrap;
 }
 .al-word span {
