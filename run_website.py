@@ -49,8 +49,9 @@ def install_packages():
         say("1/3", "Python packages are already installed.")
         return
     say("1/3", f"Installing {', '.join(missing)} (first run takes a few minutes)...")
-    result = subprocess.run([sys.executable, "-m", "pip", "install", "-q", "-r",
-                             str(ROOT / "requirements.txt")])
+    # no -q: pip's own download progress shows, so a slow connection doesn't look like a freeze
+    result = subprocess.run([sys.executable, "-m", "pip", "install", "--progress-bar", "on",
+                             "--prefer-binary", "-r", str(ROOT / "requirements.txt")])
     if result.returncode != 0:
         sys.exit("[X] Package install failed. Check your internet connection and try again.")
 

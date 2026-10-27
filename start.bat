@@ -21,7 +21,8 @@ if not exist ".venv\Scripts\python.exe" (
     %PY% -m venv .venv || (echo [X] Could not create .venv. & pause & exit /b 1)
 )
 call ".venv\Scripts\activate.bat"
-python -m pip install -q --upgrade pip >nul 2>&1
+echo Updating pip...
+python -m pip install -q --upgrade pip
 
 rem Anything typed after start.bat is passed on, e.g.  start.bat --quick
 python run_website.py %*
