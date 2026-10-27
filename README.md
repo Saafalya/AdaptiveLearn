@@ -17,6 +17,8 @@ plus a feature-group ablation, an early-prediction sweep (day 0–180) and a **f
 
 ## Quick start
 
+**Windows, easiest:** double-click `start.bat`. It sets up a private Python environment, installs the packages, trains the models on first run and opens the website. On any system, `python run_website.py` does the same (`--quick` for faster first-time training).
+
 ```bash
 pip install -r requirements.txt
 # 1. get the data (CC BY 4.0, 46.7 MB) - see "Data" below - and unzip the 7 CSVs into data/oulad_raw/
