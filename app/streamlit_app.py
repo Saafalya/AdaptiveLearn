@@ -188,7 +188,7 @@ with results:
         text=alt.Text("probability:Q", format=".0%"), color=alt.value(colors["label"]))
     st.altair_chart(
         (bars + labels).properties(height=250, background="transparent")
-        .configure_view(strokeWidth=0).configure(font="system-ui, -apple-system, Segoe UI, Roboto, Helvetica Neue, Arial, sans-serif"),
+        .configure_view(strokeWidth=0).configure(font="Geist, Segoe UI, system-ui, sans-serif"),
         width="stretch",
     )
 

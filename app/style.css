@@ -1,9 +1,17 @@
-/* Theme colours (--void, --panel, --text, --blue, ...) are injected per theme by ui.theme_css().
-   Fonts are the operating system's own: Segoe UI on Windows, San Francisco on macOS. */
+/* Theme colours (--void, --panel, --text, --blue, ...) are injected per theme by ui.theme_css(). */
+/* Geist + Playfair Display, the same pair as the EnginePulse (C-MAPSS) project.
+   Served from app/static/fonts (Streamlit static serving), so the browser caches them. */
+@font-face { font-family: 'Geist'; font-weight: 400; font-style: normal; font-display: swap; src: url('app/static/fonts/geist-sans-latin-400-normal.woff2') format('woff2'); }
+@font-face { font-family: 'Geist'; font-weight: 500; font-style: normal; font-display: swap; src: url('app/static/fonts/geist-sans-latin-500-normal.woff2') format('woff2'); }
+@font-face { font-family: 'Geist'; font-weight: 600; font-style: normal; font-display: swap; src: url('app/static/fonts/geist-sans-latin-600-normal.woff2') format('woff2'); }
+@font-face { font-family: 'Playfair Display'; font-weight: 400; font-style: normal; font-display: swap; src: url('app/static/fonts/playfair-display-latin-400-normal.woff2') format('woff2'); }
+@font-face { font-family: 'Playfair Display'; font-weight: 500; font-style: normal; font-display: swap; src: url('app/static/fonts/playfair-display-latin-500-normal.woff2') format('woff2'); }
+@font-face { font-family: 'Playfair Display'; font-weight: 400; font-style: italic; font-display: swap; src: url('app/static/fonts/playfair-display-latin-400-italic.woff2') format('woff2'); }
+
 :root {
   --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
-  --display: "Arial Black", "Helvetica Neue", Arial, sans-serif;
-  --body: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --serif: 'Playfair Display', Georgia, 'Times New Roman', serif;
+  --body: 'Geist', 'Segoe UI', system-ui, -apple-system, sans-serif;
   --sheen: linear-gradient(105deg, transparent 40%, rgba(255, 255, 255, 0.9) 50%, transparent 60%);
 }
 
@@ -15,7 +23,11 @@
     var(--void);
   color: var(--text);
 }
-.stApp, .stApp p, .stApp label, .stApp li, .stApp input, .stApp button, .stMarkdown { font-family: var(--body); }
+.stApp, .stApp p, .stApp label, .stApp li, .stApp input, .stApp button, .stMarkdown,
+.stApp [data-testid="stMarkdownContainer"], .stApp table { font-family: var(--body); }
+/* Playfair defaults to old-style figures; use lining figures so dates and percentages sit level */
+.al-word, .al-head h2, .al-plain h2, .al-how h3, .al-sub, .al-cell__value, .al-table td:first-child { font-variant-numeric: lining-nums; font-feature-settings: "lnum" 1; }
+.stApp [data-testid="stHeaderActionElements"], .stApp .al-plain h2 a, .stApp .al-head h2 a { display: none !important; }
 [data-testid="stMain"] p, [data-testid="stMain"] li { color: var(--text); }
 header[data-testid="stHeader"] { background: transparent; }
 section[data-testid="stSidebar"], [data-testid="stSidebarCollapsedControl"], [data-testid="collapsedControl"] { display: none !important; }
@@ -59,9 +71,9 @@ h1, h2, h3, h4 { font-family: var(--body); letter-spacing: -0.01em; color: var(-
 /* ---------- hero ---------- */
 .al-hero { container-type: inline-size; padding: 4px 4px 0; }
 .al-word {
-  margin: 0; line-height: 0.9; white-space: nowrap;
-  font-family: var(--display); font-weight: 900;
-  letter-spacing: -0.03em; font-size: clamp(1.8rem, 10.2cqw, 9.5rem);
+  margin: 0; line-height: 1; white-space: nowrap; padding-bottom: 0.06em;
+  font-family: var(--serif); font-weight: 500;
+  letter-spacing: -0.025em; font-size: clamp(2.2rem, 14.8cqw, 11rem);
 }
 .al-word span {
   display: inline-block;
@@ -91,7 +103,7 @@ h1, h2, h3, h4 { font-family: var(--body); letter-spacing: -0.01em; color: var(-
   display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 32px;
   align-items: end; margin: 26px 0 18px;
 }
-.stApp .al-lede { margin: 0; font-size: 1.12rem; line-height: 1.55; color: var(--text); max-width: 46ch; }
+.stApp .al-lede { margin: 0; font-size: 1.15rem; line-height: 1.6; color: var(--text); max-width: 46ch; font-weight: 400; }
 .stApp .al-facts { margin: 0; font-size: 0.9rem; line-height: 1.6; color: var(--mute); max-width: 52ch; }
 .stApp .al-facts b { color: var(--text); font-weight: 600; font-variant-numeric: tabular-nums; }
 
@@ -110,7 +122,7 @@ h1, h2, h3, h4 { font-family: var(--body); letter-spacing: -0.01em; color: var(-
 
 /* ---------- explorer ---------- */
 .al-head { margin: 56px 0 18px; scroll-margin-top: 24px; }
-.al-head h2 { margin: 0 0 6px; font-size: clamp(1.6rem, 3vw, 2.2rem); font-weight: 700; }
+.al-head h2 { margin: 0 0 8px; font-family: var(--serif); font-size: clamp(1.8rem, 3.2vw, 2.4rem); font-weight: 400; line-height: 1.15; letter-spacing: -0.01em; }
 .stApp .al-head p { margin: 0; color: var(--mute); font-size: 0.95rem; max-width: 70ch; }
 
 .st-key-controls {
@@ -131,10 +143,10 @@ h1, h2, h3, h4 { font-family: var(--body); letter-spacing: -0.01em; color: var(-
 .al-cell:first-child { border-left: 0; }
 .al-cell__label { font-size: 0.8rem; color: var(--mute); }
 .al-cell__value {
-  font-weight: 700; font-size: 2rem; letter-spacing: -0.02em;
-  line-height: 1.1; margin: 6px 0 6px; color: var(--text); font-variant-numeric: tabular-nums;
+  font-family: var(--serif); font-weight: 400; font-size: 2.4rem; letter-spacing: -0.01em;
+  line-height: 1.05; margin: 6px 0 6px; color: var(--text); font-variant-numeric: lining-nums tabular-nums;
 }
-.al-cell__value--name { font-size: 1.15rem; line-height: 1.25; margin-top: 10px; }
+.al-cell__value--name { font-size: 1.35rem; line-height: 1.2; margin-top: 10px; }
 .al-cell__note { font-size: 0.8rem; color: var(--mute); }
 .al-cell--risk::before { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 3px; background: var(--blue); }
 .al-cell--risk.is-medium::before { background: var(--amber); }
@@ -144,7 +156,7 @@ h1, h2, h3, h4 { font-family: var(--body); letter-spacing: -0.01em; color: var(-
 .stApp .al-truth { margin: 10px 2px 0; font-size: 0.85rem; color: var(--mute); }
 .stApp .al-truth b { color: var(--text); }
 
-.al-sub { font-weight: 600; font-size: 1rem; margin: 28px 0 10px; color: var(--text); }
+.al-sub { font-family: var(--serif); font-weight: 400; font-size: 1.3rem; margin: 28px 0 10px; color: var(--text); }
 
 .al-timeline { list-style: none; margin: 0; padding: 0 0 0 4px; position: relative; }
 .al-timeline::before {
@@ -171,7 +183,7 @@ h1, h2, h3, h4 { font-family: var(--body); letter-spacing: -0.01em; color: var(-
 
 /* ---------- results in plain words ---------- */
 .al-plain { margin-top: 64px; }
-.al-plain h2 { margin: 0 0 6px; font-size: clamp(1.4rem, 2.6vw, 1.9rem); font-weight: 700; }
+.al-plain h2 { margin: 0 0 8px; font-family: var(--serif); font-size: clamp(1.7rem, 3vw, 2.25rem); font-weight: 400; line-height: 1.15; letter-spacing: -0.01em; }
 .stApp .al-plain > p { margin: 0 0 18px; color: var(--mute); font-size: 0.95rem; max-width: 70ch; }
 .al-table-wrap { border: 1px solid var(--line); border-radius: 18px; overflow-x: auto; background: var(--panel); }
 .al-table { width: 100%; border-collapse: collapse; font-size: 0.92rem; min-width: 720px; }
@@ -181,7 +193,7 @@ h1, h2, h3, h4 { font-family: var(--body); letter-spacing: -0.01em; color: var(-
 }
 .al-table td { padding: 16px 18px; border-bottom: 1px solid var(--line); vertical-align: top; color: var(--text); line-height: 1.5; }
 .al-table tr:last-child td { border-bottom: 0; }
-.al-table td:first-child { font-weight: 600; width: 26%; }
+.al-table td:first-child { font-family: var(--serif); font-size: 1.02rem; font-weight: 400; width: 26%; line-height: 1.4; }
 .al-table td:nth-child(2) { width: 22%; color: var(--text-2); font-variant-numeric: tabular-nums; }
 .al-table .tag { display: inline-block; margin-top: 6px; padding: 1px 9px; border-radius: 999px; font-size: 0.75rem; font-weight: 600; }
 .al-table .tag-good { background: var(--good-bg); color: var(--good-fg); }
@@ -189,7 +201,7 @@ h1, h2, h3, h4 { font-family: var(--body); letter-spacing: -0.01em; color: var(-
 
 /* ---------- how it works ---------- */
 .al-how { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 48px; margin-top: 56px; padding-top: 32px; border-top: 1px solid var(--line); }
-.al-how h3 { margin: 0 0 6px; font-size: 1.2rem; font-weight: 700; }
+.al-how h3 { margin: 0 0 8px; font-family: var(--serif); font-size: 1.45rem; font-weight: 400; }
 .stApp .al-how p { margin: 0 0 18px; color: var(--mute); font-size: 0.92rem; line-height: 1.55; max-width: 50ch; }
 .al-sweep { display: flex; align-items: flex-end; gap: 10px; height: 120px; }
 .al-sweep div { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100%; gap: 6px; }

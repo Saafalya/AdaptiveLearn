@@ -51,7 +51,7 @@ function init(root) {
   const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   let BLUE = [91, 134, 255], RED = [255, 74, 102], C = {};
-  const FONT = 'system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif';
+  const FONT = "'Geist', 'Segoe UI', system-ui, sans-serif";
   const rgb = (hex) => { const h = hex.trim().replace('#', ''); return [0, 2, 4].map((i) => parseInt(h.slice(i, i + 2), 16)); };
   function readTheme() {
     const cs = getComputedStyle(wrap), v = (n) => cs.getPropertyValue(n).trim();
@@ -83,6 +83,7 @@ function init(root) {
     S.dirty = true;
   }
   new ResizeObserver(resize).observe(wrap);
+  if (document.fonts) document.fonts.ready.then(() => { S.dirty = true; });   // redraw labels in Geist once loaded
 
   function nearest(mx, my, within) {
     let best = -1, bd = within * within;

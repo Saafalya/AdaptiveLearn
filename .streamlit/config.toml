@@ -9,3 +9,6 @@ font = "sans serif"
 [client]
 toolbarMode = "minimal"
 showSidebarNavigation = false
+
+[server]
+enableStaticServing = true

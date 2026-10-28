@@ -85,7 +85,7 @@ def hero(metrics, auc90):
     d = metrics["dataset"]
     render(f"""
     <section class="al-hero">
-      <div class="al-word" role="heading" aria-level="1"><span>ADAPTIVE</span><span>LEARN</span></div>
+      <div class="al-word" role="heading" aria-level="1"><span>Adaptive</span><span>Learn</span></div>
       <div class="al-intro">
         <p class="al-lede">Each dot is a real student the models never saw. Where it sits shows what
         they had done by day 90 of the course; its colour shows how the course actually ended.
