@@ -77,8 +77,29 @@ def chart_colors(name):
             "label": t["text"], "axis": t["text-2"], "tick": t["tick"], "grid": t["line"]}
 
 
+FONT_DIR = Path(__file__).with_name("static") / "fonts"
+
+
+@st.cache_data
+def _embedded_font_faces():
+    """@font-face rules with the fonts inlined, for servers started without static file serving."""
+    import base64
+    import re
+    css = CSS.read_text(encoding="utf-8")
+    out = []
+    for rule in re.findall(r"@font-face \{[^}]*\}", css):
+        name = re.search(r"fonts/([\w.-]+\.woff2)", rule).group(1)
+        data = base64.b64encode((FONT_DIR / name).read_bytes()).decode()
+        out.append(rule.replace(f"url('app/static/fonts/{name}')", f"url(data:font/woff2;base64,{data})"))
+    return "".join(out)
+
+
 def inject_css():
-    st.markdown(f"<style>{CSS.read_text(encoding='utf-8')}</style>", unsafe_allow_html=True)
+    css = CSS.read_text(encoding="utf-8")
+    if not st.get_option("server.enableStaticServing"):
+        import re                               # same fonts, delivered inside the page instead
+        css = _embedded_font_faces() + re.sub(r"@font-face \{[^}]*\}", "", css)
+    st.markdown(f"<style>{css}</style>", unsafe_allow_html=True)
 
 
 def hero(metrics, auc90):
