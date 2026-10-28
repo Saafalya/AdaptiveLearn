@@ -270,7 +270,7 @@ def page_about():
     ui.about(metrics)
 
 
-OVERVIEW = st.Page(page_overview, title="Overview", url_path="overview", default=True)
+OVERVIEW = st.Page(page_overview, title="Overview", default=True)
 EXPLORER = st.Page(page_explorer, title="Student explorer", url_path="explorer")
 RESULTS = st.Page(page_results, title="Results", url_path="results")
 ABOUT = st.Page(page_about, title="About", url_path="about")
