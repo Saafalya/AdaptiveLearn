@@ -43,7 +43,7 @@ h1, h2, h3, h4 { font-family: var(--display); letter-spacing: -0.01em; color: va
 .al-word {
   margin: 0; line-height: 0.82; white-space: nowrap;
   font-family: var(--display); font-weight: 900; font-stretch: 125%;
-  letter-spacing: -0.035em; font-size: clamp(2rem, 9.6cqw, 9.5rem);
+  letter-spacing: -0.035em; font-size: clamp(1.8rem, 9cqw, 9rem);
 }
 .al-word span {
   display: inline-block;
