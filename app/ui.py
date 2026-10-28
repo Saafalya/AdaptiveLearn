@@ -89,7 +89,7 @@ def hero(metrics, auc90):
       <div class="al-intro">
         <p class="al-lede">Each dot is a real student the models never saw. Where it sits shows what
         they had done by day 90 of the course; its colour shows how the course actually ended.
-        Click one to open their forecast.</p>
+        Click one to open that student's forecast.</p>
         <p class="al-facts">Built from <b>{d["n_enrolments_total"]:,}</b> enrolments and
         <b>{d["n_click_rows_raw"] / 1e6:.1f} million</b> clicks across
         <b>{metrics["recommender"]["n_presentations"]}</b> course presentations of the Open University.
@@ -166,7 +166,7 @@ def note(html):
     render(f'<div class="al-note">{html}</div>')
 
 
-def plain_summary(metrics, tables):
+def plain_summary(metrics, tables, heading=True):
     """The headline results, each with a plain-English reading. Numbers come from results/."""
     c, r = metrics["classification"], metrics["regression"]
     fair, mix, rec = tables["fairness"], tables["persona_mix"], tables["recommender"]
@@ -223,8 +223,8 @@ def plain_summary(metrics, tables):
         f"<td>{escape(plain_text)}</td></tr>"
         for q, num, plain_text, kind, label in rows)
     render(f"""
-    <section class="al-plain" aria-labelledby="plain-title">
-      <h2 id="plain-title">What the results mean, in plain words</h2>
+    <section class="al-plain{"" if heading else " al-plain--bare"}" aria-label="Results in plain words">
+      {'<h2>What the results mean, in plain words</h2>' if heading else '<h2 class="al-h3">In plain words</h2>'}
       <p>Each line takes one result from testing on students the models never saw and says what it
       means for a teacher or student.</p>
       <div class="al-table-wrap">
@@ -266,6 +266,91 @@ def how_it_works(sweep, persona_share):
         content of the study plan they get.</p>
         <div class="al-bars">{rows}</div>
       </div>
+    </section>
+    """)
+
+
+def page_title(title, text):
+    render(f"""
+    <div class="al-page-head">
+      <h1>{escape(title)}</h1>
+      <p>{escape(text)}</p>
+    </div>
+    """)
+
+
+def in_short(metrics, tables):
+    """Three headline findings under the Overview map, each a number and one plain sentence."""
+    fair = tables["fairness"]
+    g = fair[fair.attribute == "gender"]
+    caught = float((g["recall_at_risk (TPR)"] * g.n).sum() / g.n.sum())
+    mae = metrics["regression"]["test_mae"]
+    auc = metrics["classification"]["test_at_risk_auc"]
+    items = [
+        (f"{auc * 100:.0f} in 100", "Given one student who will struggle and one who won't, it picks "
+                                    "the right one this often."),
+        (f"{round(caught * 3)} in 3", "Students who go on to fail or withdraw that it flags by day 90."),
+        (f"±{mae:.0f} points", "Typical gap between its predicted score and the real one."),
+    ]
+    cells = "".join(f'<div class="al-fact"><div class="al-fact__fig">{escape(f)}</div>'
+                    f'<p>{escape(t)}</p></div>' for f, t in items)
+    render(f'<section class="al-facts-row" aria-label="Headline results">{cells}</section>')
+
+
+def about(metrics):
+    d = metrics["dataset"]
+    tasks = [
+        ("Outcome prediction", "Classification: random forest, gradient boosting, logistic regression, "
+                               "k-nearest neighbours, decision tree", "Distinction, pass, fail or withdrawn, plus the chance of failing or withdrawing"),
+        ("Score prediction", "Regression: gradient boosting, random forest, ridge, lasso, k-nearest neighbours",
+         "Expected score on the assessments still to come"),
+        ("Learner personas", "Clustering: k-means, Gaussian mixture, Ward", "Five groups that behave alike"),
+        ("Next resources", "Recommender: popularity, item k-NN, SVD, hybrid", "Ten course pages to open next"),
+        ("Study plan", "Rules built on the model outputs", "Steps tied to the module's real upcoming assessments"),
+    ]
+    rows = "".join(f"<tr><td>{escape(a)}</td><td>{escape(b)}</td><td>{escape(c)}</td></tr>" for a, b, c in tasks)
+    render(f"""
+    <div class="al-page-head">
+      <h1>About the project</h1>
+      <p>AI-Based Personalized Learning Recommendation System Using Machine Learning. AUCML Lab ESE
+      project, Department of AIML, aligned with UN goals SDG 4 (Quality Education) and SDG 10
+      (Reduced Inequalities).</p>
+    </div>
+    <section class="al-about">
+      <div class="al-about__main">
+        <h2 class="al-h3">What it does</h2>
+        <p>Using only the first {d["cutoff_day"]} days of a course, AdaptiveLearn predicts how each student is
+        likely to finish, spots the ones who need help early, and gives each of them a study plan built
+        around their next real assessments.</p>
+        <h2 class="al-h3">How it is built</h2>
+        <div class="al-table-wrap"><table class="al-table al-table--about">
+          <thead><tr><th scope="col">Task</th><th scope="col">Methods compared</th><th scope="col">What it gives</th></tr></thead>
+          <tbody>{rows}</tbody>
+        </table></div>
+        <h2 class="al-h3">Ground rules</h2>
+        <ul class="al-list">
+          <li>Predictions only use what was known by day {d["cutoff_day"]}. Everything the models predict happens later.</li>
+          <li>Models are chosen with five-fold cross-validation on training students, grouped by student, and
+          the test students are used only to report results.</li>
+          <li>Fairness is measured across gender, disability, age, education and neighbourhood deprivation,
+          not assumed.</li>
+        </ul>
+      </div>
+      <aside class="al-about__side">
+        <h2 class="al-h3">The data</h2>
+        <p>Open University Learning Analytics Dataset: <b>{d["n_enrolments_total"]:,}</b> enrolments,
+        <b>{d["n_students_total"]:,}</b> students and <b>{d["n_click_rows_raw"] / 1e6:.1f} million</b>
+        click records. Kuzilek, Hlosta and Zdrahal, Scientific Data 4:170171 (2017), CC BY 4.0.</p>
+        <h2 class="al-h3">Team</h2>
+        <ul class="al-list al-list--plain">
+          <li>Swastik Gavhane</li>
+          <li>Aryan Gawande</li>
+          <li>Saafalya Sengupta</li>
+        </ul>
+        <h2 class="al-h3">Run it yourself</h2>
+        <p>Double-click <code>start.bat</code> on Windows, or run <code>python run_website.py</code>.
+        Code: <a href="https://github.com/Saafalya/AdaptiveLearn" target="_blank" rel="noopener">github.com/Saafalya/AdaptiveLearn</a></p>
+      </aside>
     </section>
     """)
 

@@ -211,6 +211,7 @@ function init(root) {
   }
 
   S.update = (d) => {
+    if (d.height) wrap.style.setProperty('--h', d.height + 'px');
     readTheme(); requestAnimationFrame(() => { readTheme(); S.dirty = true; });
     if (!S.meta) {
       S.meta = d.meta;
@@ -273,11 +274,12 @@ def cohort_payload(test):
     }
 
 
-def cohort_map(test, selected_row, whatif_row, whatif_risk, on_pick, theme="dark"):
+def cohort_map(test, selected_row, whatif_row, whatif_risk, on_pick, theme="dark", height=480):
     payload = dict(cohort_payload(test))
     payload["theme"] = theme
+    payload["height"] = height
     sx, sy = _xy(selected_row.total_clicks, selected_row.mean_score_early)
     gx, gy = _xy(whatif_row["total_clicks"], whatif_row["mean_score_early"])
     payload["sel"] = {"x": sx, "y": sy, "k": int(selected_row.key)}
-    payload["ghost"] = {"x": gx, "y": gy, "risk": round(float(whatif_risk), 3)}
+    payload["ghost"] = None if whatif_risk is None else {"x": gx, "y": gy, "risk": round(float(whatif_risk), 3)}
     return _component(data=payload, key="cohort", on_selected_change=on_pick)

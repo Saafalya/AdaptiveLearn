@@ -29,9 +29,9 @@
 .al-word, .al-head h2, .al-plain h2, .al-how h3, .al-sub, .al-cell__value, .al-table td:first-child { font-variant-numeric: lining-nums; font-feature-settings: "lnum" 1; }
 .stApp [data-testid="stHeaderActionElements"], .stApp .al-plain h2 a, .stApp .al-head h2 a { display: none !important; }
 [data-testid="stMain"] p, [data-testid="stMain"] li { color: var(--text); }
-header[data-testid="stHeader"] { background: transparent; }
+header[data-testid="stHeader"] { display: none; }
 section[data-testid="stSidebar"], [data-testid="stSidebarCollapsedControl"], [data-testid="collapsedControl"] { display: none !important; }
-.block-container { padding-top: 1.25rem; padding-bottom: 4rem; max-width: 1280px; }
+.block-container { padding-top: 0; padding-bottom: 3rem; max-width: 1280px; }
 h1, h2, h3, h4 { font-family: var(--body); letter-spacing: -0.01em; color: var(--text); }
 
 /* Streamlit's own widgets, recoloured per theme */
@@ -51,7 +51,6 @@ h1, h2, h3, h4 { font-family: var(--body); letter-spacing: -0.01em; color: var(-
 .stApp [data-testid="stWidgetLabel"] p { color: var(--mute) !important; }
 
 /* ---------- appearance switch ---------- */
-.st-key-theme { display: flex; justify-content: flex-end; }
 .st-key-theme [data-testid="stButtonGroup"] { background: var(--panel); border: 1px solid var(--line); border-radius: 999px; padding: 3px; gap: 2px; }
 .st-key-theme button {
   border: 0 !important; border-radius: 999px !important; background: transparent !important;
@@ -232,4 +231,97 @@ h1, h2, h3, h4 { font-family: var(--body); letter-spacing: -0.01em; color: var(-
 @media (prefers-reduced-motion: reduce) {
   .al-word span { animation: none; }
   .al-meter i, .st-key-theme button { transition: none; }
+}
+
+
+/* ---------- title bar ---------- */
+/* Streamlit wraps each block in a box only as tall as the block, so pin the wrapper */
+[data-testid="stLayoutWrapper"]:has(> .st-key-nav) { position: sticky; top: 12px; z-index: 100; }
+.st-key-nav {
+  margin: 12px 0 28px; padding: 10px 12px 10px 20px; border-radius: 18px;
+  background: color-mix(in srgb, var(--panel) 78%, transparent);
+  -webkit-backdrop-filter: saturate(140%) blur(14px); backdrop-filter: saturate(140%) blur(14px);
+  border: 1px solid var(--line);
+  box-shadow: 0 1px 0 var(--inset) inset, 0 18px 40px -28px var(--shadow);
+  flex-wrap: nowrap !important;
+}
+.st-key-nav [data-testid="stPageLink"] a { padding: 0; background: transparent !important; text-decoration: none; }
+.st-key-brand { margin-right: 18px; }
+.st-key-brand a { padding: 4px 0 !important; overflow: visible; }
+.st-key-brand a p, .st-key-brand a span {
+  font-family: var(--serif) !important; font-size: 1.45rem !important; font-weight: 500 !important;
+  letter-spacing: -0.02em; line-height: 1;
+  background: linear-gradient(90deg, var(--blue) 0 54%, var(--red) 54% 100%);
+  -webkit-background-clip: text; background-clip: text; color: transparent !important;
+}
+.st-key-links { gap: 4px !important; margin-right: auto; }
+[class*="st-key-link_"] a {
+  border-radius: 999px; padding: 7px 14px !important;
+  transition: background-color 150ms ease, color 150ms ease;
+}
+[class*="st-key-link_"] a p, [class*="st-key-link_"] a span { color: var(--mute) !important; font-size: 0.9rem !important; font-weight: 500 !important; }
+[class*="st-key-link_"][class*="_on"] a { background: var(--track) !important; }
+[class*="st-key-link_"][class*="_on"] a p, [class*="st-key-link_"][class*="_on"] a span { color: var(--text) !important; }
+[class*="st-key-link_"] a:active { transform: scale(0.97); }
+[class*="st-key-link_"] a:focus-visible, .st-key-brand a:focus-visible { outline: 2px solid var(--blue-soft); outline-offset: 2px; border-radius: 999px; }
+@media (hover: hover) and (pointer: fine) {
+  [class*="st-key-link_"] a:hover p, [class*="st-key-link_"] a:hover span { color: var(--text) !important; }
+}
+
+/* ---------- page headings ---------- */
+.al-page-head { margin: 12px 0 28px; }
+.al-page-head h1 {
+  margin: 0 0 10px; padding: 0; font-family: var(--serif); font-weight: 400;
+  font-size: clamp(2.2rem, 4.6vw, 3.4rem); line-height: 1.08; letter-spacing: -0.015em; color: var(--text);
+  font-variant-numeric: lining-nums;
+}
+.stApp .al-page-head p { margin: 0; color: var(--mute); font-size: 1.02rem; line-height: 1.6; max-width: 68ch; }
+.stApp .al-h3 { margin: 0 0 10px !important; padding: 0 !important; font-family: var(--serif) !important; font-weight: 400 !important; font-size: 1.55rem !important; color: var(--text); line-height: 1.2 !important; letter-spacing: -0.005em; }
+.al-plain--bare { margin-top: 0; }
+.al-head { margin-top: 12px; }
+
+/* ---------- overview: headline strip and links ---------- */
+.al-facts-row { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0; margin: 36px 0 22px; border-top: 1px solid var(--line); }
+.al-fact { padding: 22px 28px 4px 0; }
+.al-fact + .al-fact { padding-left: 28px; border-left: 1px solid var(--line); }
+.al-fact__fig { font-family: var(--serif); font-size: clamp(2rem, 3.6vw, 2.9rem); line-height: 1; color: var(--text); font-variant-numeric: lining-nums; }
+.stApp .al-fact p { margin: 10px 0 0; color: var(--mute); font-size: 0.92rem; line-height: 1.5; max-width: 34ch; }
+.st-key-cta a {
+  border: 1px solid var(--line-strong); border-radius: 999px; padding: 10px 18px !important; background: var(--panel) !important;
+  transition: transform 160ms var(--ease-out), border-color 150ms ease;
+}
+.st-key-cta > div:first-child a { background: var(--text) !important; border-color: var(--text); }
+.st-key-cta > div:first-child a p, .st-key-cta > div:first-child a span { color: var(--void) !important; }
+.st-key-cta a p, .st-key-cta a span { color: var(--text) !important; font-weight: 500 !important; }
+.st-key-cta a:active { transform: scale(0.97); }
+.st-key-cta a:focus-visible { outline: 2px solid var(--blue-soft); outline-offset: 2px; }
+
+/* ---------- explorer: keep the controls in view while the results scroll ---------- */
+@media (min-width: 901px) {
+  [data-testid="stLayoutWrapper"]:has(> .st-key-controls) { position: sticky; top: 96px; }
+}
+
+/* ---------- about ---------- */
+.al-about { display: grid; grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr); gap: 56px; }
+.stApp .al-about__main > * + .al-h3, .stApp .al-about__side > * + .al-h3 { margin-top: 34px !important; }
+.stApp .al-about p, .stApp .al-about li { color: var(--text-2); font-size: 0.95rem; line-height: 1.65; max-width: 68ch; }
+.stApp .al-about b { color: var(--text); font-weight: 600; }
+.al-about code { font-size: 0.82rem; color: var(--blue-soft); background: var(--track); padding: 1px 6px; border-radius: 6px; }
+.al-about a { color: var(--blue-soft); text-underline-offset: 3px; }
+.al-about__side { padding-left: 32px; border-left: 1px solid var(--line); }
+.al-list { margin: 0; padding-left: 1.1rem; }
+.al-list li + li { margin-top: 6px; }
+.al-list--plain { list-style: none; padding: 0; }
+.al-table--about { min-width: 620px; }
+.al-table--about td:first-child { width: 22%; }
+.al-table--about td:nth-child(2) { width: 40%; }
+
+@media (max-width: 900px) {
+  [data-testid="stLayoutWrapper"]:has(> .st-key-nav) { position: static; }
+  .st-key-nav { flex-wrap: wrap !important; row-gap: 8px; padding: 12px 14px; }
+  .st-key-links { order: 3; width: 100%; overflow-x: auto; flex-wrap: nowrap !important; margin-right: 0; }
+  .al-facts-row { grid-template-columns: 1fr; }
+  .al-fact + .al-fact { padding-left: 0; border-left: 0; border-top: 1px solid var(--line); }
+  .al-about { grid-template-columns: 1fr; gap: 32px; }
+  .al-about__side { padding-left: 0; border-left: 0; }
 }
