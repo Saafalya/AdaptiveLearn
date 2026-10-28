@@ -5,6 +5,7 @@ Four pages behind one title bar: Overview, Student explorer, Results, About.
 """
 import importlib
 import json
+import random
 import sys
 from pathlib import Path
 
@@ -149,31 +150,61 @@ def page_explorer():
 
     with controls:
         with st.container(key="controls"):
-            st.markdown("### Student")
-            st.selectbox("Module", modules, key="mod", on_change=on_module_change)
-            st.selectbox("Presentation", presentations(ss.mod), key="pres",
+            st.markdown('<div class="al-panel-title">Student</div>', unsafe_allow_html=True)
+            c1, c2 = st.columns(2, gap="small")
+            c1.selectbox("Module", modules, key="mod", on_change=on_module_change)
+            c2.selectbox("Presentation", presentations(ss.mod), key="pres",
                          on_change=lambda: ss.update(num=1))
-            st.number_input(f"Student number (1 to {len(pool)})", 1, len(pool), key="num")
+            n1, n2 = st.columns([1.6, 1], gap="small", vertical_alignment="bottom")
+            n1.number_input(f"Student, 1 to {len(pool)}", 1, len(pool), key="num")
+            with n2.container(key="random"):
+                st.button("Random", on_click=lambda: ss.update(num=int(random.randint(1, len(pool)))),
+                          width="stretch", help="Pick another student from this presentation")
             sk = int(base.key)                   # widget keys per student, so sliders reset on a new pick
 
-            st.markdown("<hr>", unsafe_allow_html=True)
-            st.markdown("### What if they had…")
-            st.markdown('<p class="al-hint">Starts at what this student really did. Their ghost '
-                        'dot on the map moves as you change these.</p>', unsafe_allow_html=True)
+            real = {
+                "total_clicks": int(min(base.total_clicks, 6000)),
+                "active_days": int(min(base.active_days, 90)),
+                "clicks_last_14d": int(min(base.clicks_last_14d, 1500)),
+                "days_since_last_active": int(min(base.days_since_last_active, 90)),
+                "n_submitted": int(min(base.n_submitted, 6)),
+                "mean_score_early": 0 if pd.isna(base.mean_score_early) else int(base.mean_score_early),
+            }
+            keys = {f: f"w{sk}_{f}" for f in real}
+            changed = [f for f in real if ss.get(keys[f], real[f]) != real[f]]
+
+            def reset():
+                for k in keys.values():
+                    ss.pop(k, None)
+
+            st.markdown('<hr class="al-rule">', unsafe_allow_html=True)
+            h1, h2 = st.columns([1.6, 1], gap="small", vertical_alignment="center")
+            h1.markdown('<div class="al-panel-title">What if they had…</div>', unsafe_allow_html=True)
+            with h2.container(key="reset"):
+                st.button("Reset", on_click=reset, disabled=not changed, width="stretch",
+                          help="Put every value back to what this student really did")
+            st.markdown(f'<p class="al-hint">{"Values start at what this student really did." if not changed else f"{len(changed)} changed. The ghost dot on the map shows where they would sit now."}</p>',
+                        unsafe_allow_html=True)
+
+            def whatif(field, label, hi, unit=""):
+                slot = st.empty()
+                v = st.slider(label, 0, hi, real[field], key=keys[field], label_visibility="collapsed")
+                was = (f'<span class="al-was">was {real[field]:,}{unit}</span>' if v != real[field] else "")
+                slot.markdown(f'<div class="al-field{" is-changed" if v != real[field] else ""}">'
+                              f'<span class="al-field__label">{label}</span>'
+                              f'<span class="al-field__value">{was}<b>{v:,}{unit}</b></span></div>',
+                              unsafe_allow_html=True)
+                return v
+
             row = base.copy()
-            row["total_clicks"] = st.slider("Clicked this many times by day 90", 0, 6000,
-                                            int(min(base.total_clicks, 6000)), key=f"c{sk}")
-            row["active_days"] = st.slider("Been active on this many days", 0, 90,
-                                           int(min(base.active_days, 90)), key=f"a{sk}")
-            row["clicks_last_14d"] = st.slider("Clicked this many times in the last two weeks", 0, 1500,
-                                               int(min(base.clicks_last_14d, 1500)), key=f"l{sk}")
-            row["days_since_last_active"] = st.slider("Last logged in this many days ago", 0, 90,
-                                                      int(min(base.days_since_last_active, 90)), key=f"d{sk}")
-            row["n_submitted"] = st.slider("Handed in this many assessments", 0, 6,
-                                           int(min(base.n_submitted, 6)), key=f"n{sk}")
-            default_score = 0 if pd.isna(base.mean_score_early) else int(base.mean_score_early)
-            row["mean_score_early"] = st.slider("Averaged this score so far (%)", 0, 100, default_score,
-                                                key=f"s{sk}")
+            st.markdown('<div class="al-group">Activity by day 90</div>', unsafe_allow_html=True)
+            row["total_clicks"] = whatif("total_clicks", "Page clicks", 6000)
+            row["active_days"] = whatif("active_days", "Days active", 90)
+            row["clicks_last_14d"] = whatif("clicks_last_14d", "Clicks, last two weeks", 1500)
+            row["days_since_last_active"] = whatif("days_since_last_active", "Days since last login", 90)
+            st.markdown('<div class="al-group">Assessments</div>', unsafe_allow_html=True)
+            row["n_submitted"] = whatif("n_submitted", "Handed in", 6)
+            row["mean_score_early"] = whatif("mean_score_early", "Average score", 100, "%")
             row["clicks_per_active_day"] = row["total_clicks"] / max(row["active_days"], 1)
 
     out = profile(row, art)

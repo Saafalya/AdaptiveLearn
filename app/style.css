@@ -325,3 +325,50 @@ h1, h2, h3, h4 { font-family: var(--body); letter-spacing: -0.01em; color: var(-
   .al-about { grid-template-columns: 1fr; gap: 32px; }
   .al-about__side { padding-left: 0; border-left: 0; }
 }
+
+/* ---------- explorer controls panel ---------- */
+.st-key-controls { padding: 20px 20px 14px; gap: 10px; }
+.st-key-controls [data-testid="stVerticalBlock"] { gap: 10px; }
+.al-panel-title { font-weight: 600; font-size: 0.95rem; color: var(--text); letter-spacing: -0.005em; }
+.st-key-controls [data-testid="stWidgetLabel"] p { font-size: 0.8rem !important; }
+.st-key-controls .al-rule { border: 0; border-top: 1px solid var(--line); margin: 8px 0 2px; }
+.stApp .st-key-controls .al-hint { margin: -2px 0 2px; font-size: 0.8rem; line-height: 1.45; color: var(--mute); min-height: 2.3em; }
+.al-group { margin-top: 8px; font-size: 0.75rem; font-weight: 500; color: var(--mute); letter-spacing: 0.01em; }
+
+/* label and value on one line, the slider underneath */
+.al-field { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: -14px; }
+.al-field__label { font-size: 0.88rem; color: var(--text-2); }
+.al-field__value { display: inline-flex; align-items: baseline; gap: 8px; white-space: nowrap; }
+.al-field__value b { font-weight: 600; font-size: 0.9rem; color: var(--text); font-variant-numeric: tabular-nums; }
+.al-field.is-changed .al-field__value b { color: var(--blue-soft); }
+.al-was { font-size: 0.75rem; color: var(--mute); font-variant-numeric: tabular-nums; text-decoration: line-through; text-decoration-color: var(--line-strong); }
+
+/* sliders: neutral track and a light thumb (red stays reserved for "at risk") */
+.st-key-controls [data-testid="stSliderThumbValue"], .st-key-controls [data-testid="stSliderTickBar"] { display: none !important; }
+.st-key-controls [data-testid="stSlider"] [role="group"] > div > div:first-child { filter: saturate(0) brightness(1.25); height: 3px !important; }
+.st-key-controls [data-testid="stSlider"] [role="group"] > div > div[style*="left"] {
+  width: 14px !important; height: 14px !important; background: var(--text) !important;
+  box-shadow: 0 0 0 3px var(--panel), 0 1px 4px var(--shadow);
+  transition: transform 140ms var(--ease-out);
+}
+.st-key-controls [data-testid="stSlider"] [role="group"] > div > div[style*="left"]:active { transform: translate(-50%, -50%) scale(1.15) !important; }
+.st-key-controls [data-testid="stSlider"] [role="group"] > div > div[style*="left"]:has(input:focus-visible) { box-shadow: 0 0 0 3px var(--panel), 0 0 0 5px var(--blue-soft); }
+
+/* small secondary buttons */
+.st-key-random button, .st-key-reset button {
+  min-height: 38px; border-radius: 10px; font-size: 0.82rem; font-weight: 500;
+  background: transparent !important; color: var(--text) !important; border: 1px solid var(--line-strong) !important;
+  transition: transform 160ms var(--ease-out), background-color 150ms ease, opacity 150ms ease;
+}
+.st-key-random button p, .st-key-reset button p { color: inherit !important; font-size: 0.82rem !important; }
+.st-key-random button:active, .st-key-reset button:active { transform: scale(0.97); }
+.st-key-reset button:disabled { opacity: 0.35; }
+.st-key-reset button { min-height: 30px; padding: 0 10px; }
+@media (hover: hover) and (pointer: fine) {
+  .st-key-random button:hover, .st-key-reset button:not(:disabled):hover { background: var(--track) !important; }
+}
+.st-key-controls [data-testid="stSlider"] { margin-bottom: -10px; }
+.st-key-controls .al-group { margin-top: 14px; }
+.st-key-reset { padding-top: 10px; }
+.st-key-reset button { min-height: 28px !important; height: 28px; }
+.al-field__label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
