@@ -4,26 +4,30 @@ Built on Streamlit's inline components (st.components.v2). The JavaScript runs o
 rerun with fresh `data`; it keeps its canvas and animation state on the mount point so
 the load animation plays once and later updates glide instead of redrawing from scratch.
 """
+from pathlib import Path
+
 import numpy as np
 import streamlit as st
 
+LOADED_MTIME = Path(__file__).stat().st_mtime
+
 CSS = """
 :host { display: block; }
-.wrap { position: relative; width: 100%; height: var(--h, 480px); font-family: 'Schibsted Grotesk', system-ui, sans-serif; }
+.wrap { position: relative; width: 100%; height: var(--h, 480px); font-family: var(--body); }
 canvas { display: block; width: 100%; height: 100%; border-radius: 22px; cursor: crosshair; }
 canvas.is-pointing { cursor: pointer; }
-canvas:focus-visible { outline: 2px solid #8fa9ff; outline-offset: 3px; }
+canvas:focus-visible { outline: 2px solid var(--blue-soft); outline-offset: 3px; }
 .tip {
   position: absolute; pointer-events: none; z-index: 2; min-width: 168px;
-  padding: 10px 12px; border-radius: 12px; font-size: 12.5px; line-height: 1.45; color: #e7ebf7;
-  background: rgba(12, 19, 40, 0.92); border: 1px solid rgba(160, 180, 240, 0.22);
-  box-shadow: 0 18px 40px -16px rgba(0, 0, 0, 0.8);
+  padding: 10px 12px; border-radius: 12px; font-size: 12.5px; line-height: 1.45; color: var(--text);
+  background: var(--tip-bg); border: 1px solid var(--line-strong);
+  box-shadow: 0 18px 40px -16px var(--shadow);
   opacity: 0; transform: translateY(4px); transition: opacity 120ms ease-out, transform 120ms ease-out;
 }
 .tip.on { opacity: 1; transform: translateY(0); }
 .tip b { font-weight: 600; }
-.tip .o0 { color: #8fb0ff; } .tip .o1 { color: #ff8a9c; }
-.tip small { display: block; margin-top: 4px; color: #8e98b6; }
+.tip .o0 { color: var(--blue-soft); } .tip .o1 { color: var(--red-soft); }
+.tip small { display: block; margin-top: 4px; color: var(--mute); }
 @media (max-width: 640px) { .wrap { height: 380px; } }
 """
 
@@ -46,7 +50,17 @@ function init(root) {
   const ctx = canvas.getContext('2d');
   const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-  const BLUE = [91, 134, 255], RED = [255, 74, 102];
+  let BLUE = [91, 134, 255], RED = [255, 74, 102], C = {};
+  const FONT = 'system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif';
+  const rgb = (hex) => { const h = hex.trim().replace('#', ''); return [0, 2, 4].map((i) => parseInt(h.slice(i, i + 2), 16)); };
+  function readTheme() {
+    const cs = getComputedStyle(wrap), v = (n) => cs.getPropertyValue(n).trim();
+    C = { top: v('--canvas-top'), bottom: v('--canvas-bottom'), grid: v('--grid'), tick: v('--tick'),
+          label: v('--mute'), text: v('--text'), ring: v('--text'), guide: v('--guide') };
+    if (v('--blue')) BLUE = rgb(v('--blue'));
+    if (v('--red')) RED = rgb(v('--red'));
+    S.dotAlpha = parseFloat(v('--dot-alpha')) || 0.42;
+  }
   const PAD = { l: 58, r: 22, t: 42, b: 80 };
   const S = { pts: [], sel: null, ghost: null, ghostFrom: null, ghostAt: 0, base: null,
               born: 0, mouse: null, hover: -1, W: 0, H: 0, dpr: 1, dirty: true, meta: null };
@@ -110,8 +124,8 @@ function init(root) {
   function drawAxes() {
     const m = S.meta;
     ctx.save();
-    ctx.strokeStyle = 'rgba(150, 170, 230, 0.10)'; ctx.lineWidth = 1;
-    ctx.fillStyle = '#6f7a99'; ctx.font = '11px "Schibsted Grotesk", system-ui, sans-serif';
+    ctx.strokeStyle = C.grid; ctx.lineWidth = 1;
+    ctx.fillStyle = C.tick; ctx.font = '11px ' + FONT;
     ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
     for (const v of [0, 25, 50, 75, 100]) {
       const y = sy(v); ctx.beginPath(); ctx.moveTo(PAD.l, y); ctx.lineTo(S.W - PAD.r, y); ctx.stroke();
@@ -123,7 +137,7 @@ function init(root) {
       const x = sx(Math.log1p(c));
       ctx.fillText(c >= 1000 ? (c / 1000) + 'k' : String(c), x, S.H - PAD.b + 46);
     }
-    ctx.fillStyle = '#8e98b6'; ctx.font = '12px "Schibsted Grotesk", system-ui, sans-serif';
+    ctx.fillStyle = C.label; ctx.font = '12px ' + FONT;
     ctx.textAlign = 'right'; ctx.textBaseline = 'alphabetic';
     ctx.fillText('Clicks on course pages by day 90 (log scale)', S.W - PAD.r, S.H - 12);
     ctx.textAlign = 'left';
@@ -143,7 +157,7 @@ function init(root) {
     ctx.setTransform(S.dpr, 0, 0, S.dpr, 0, 0);
     ctx.clearRect(0, 0, S.W, S.H);
     const g = ctx.createLinearGradient(0, 0, 0, S.H);
-    g.addColorStop(0, '#0c1328'); g.addColorStop(1, '#080d1f');
+    g.addColorStop(0, C.top); g.addColorStop(1, C.bottom);
     ctx.fillStyle = g; ctx.fillRect(0, 0, S.W, S.H);
     drawAxes();
 
@@ -158,22 +172,22 @@ function init(root) {
       const d = Math.hypot(p.px - mx, p.py - my);
       const near = d < 70 ? 1 - d / 70 : 0;
       const c = p.o ? RED : BLUE;
-      ctx.fillStyle = `rgba(${c[0]},${c[1]},${c[2]},${0.42 + near * 0.58})`;
+      ctx.fillStyle = `rgba(${c[0]},${c[1]},${c[2]},${S.dotAlpha + near * (1 - S.dotAlpha)})`;
       ctx.beginPath(); ctx.arc(p.px, p.py, 1.7 + near * 1.9, 0, 6.2832); ctx.fill();
     }
 
     if (S.hover >= 0) {
       const p = S.pts[S.hover];
-      ctx.strokeStyle = 'rgba(231,235,247,0.9)'; ctx.lineWidth = 1.5;
+      ctx.strokeStyle = C.ring; ctx.lineWidth = 1.5;
       ctx.beginPath(); ctx.arc(p.px, p.py, 6, 0, 6.2832); ctx.stroke();
     }
 
     if (S.sel && intro >= 1) {
       const x = sx(S.sel.x), y = sy(S.sel.y);
-      ctx.strokeStyle = 'rgba(231,235,247,0.18)'; ctx.setLineDash([3, 4]); ctx.lineWidth = 1;
+      ctx.strokeStyle = C.guide; ctx.setLineDash([3, 4]); ctx.lineWidth = 1;
       ctx.beginPath(); ctx.moveTo(x, PAD.t); ctx.lineTo(x, S.H - PAD.b + 30);
       ctx.moveTo(PAD.l, y); ctx.lineTo(S.W - PAD.r, y); ctx.stroke(); ctx.setLineDash([]);
-      ctx.strokeStyle = '#e7ebf7'; ctx.lineWidth = 2;
+      ctx.strokeStyle = C.ring; ctx.lineWidth = 2;
       ctx.beginPath(); ctx.arc(x, y, 8, 0, 6.2832); ctx.stroke();
 
       // the sliders round to whole numbers, so ignore differences smaller than that
@@ -181,14 +195,14 @@ function init(root) {
       if (moved) {
         const from = S.ghostFrom || S.sel, k = ease(gt);
         const gx = sx(from.x + (S.ghost.x - from.x) * k), gy = sy(from.y + (S.ghost.y - from.y) * k);
-        ctx.strokeStyle = 'rgba(231,235,247,0.55)'; ctx.setLineDash([2, 5]); ctx.lineWidth = 1.5;
+        ctx.strokeStyle = C.label; ctx.setLineDash([2, 5]); ctx.lineWidth = 1.5;
         ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(gx, gy); ctx.stroke(); ctx.setLineDash([]);
         const rg = ctx.createRadialGradient(gx - 3, gy - 3, 1, gx, gy, 11);
         const col = S.ghost.risk >= 0.5 ? RED : BLUE;
         rg.addColorStop(0, '#ffffff'); rg.addColorStop(0.45, `rgb(${col.join(',')})`);
         rg.addColorStop(1, `rgba(${col.join(',')},0.15)`);
         ctx.fillStyle = rg; ctx.beginPath(); ctx.arc(gx, gy, 10, 0, 6.2832); ctx.fill();
-        ctx.fillStyle = '#e7ebf7'; ctx.font = '600 12px "Schibsted Grotesk", system-ui, sans-serif';
+        ctx.fillStyle = C.text; ctx.font = '600 12px ' + FONT;
         ctx.textAlign = gx > S.W - 140 ? 'right' : 'left'; ctx.textBaseline = 'bottom';
         ctx.fillText(`What-if: ${Math.round(S.ghost.risk * 100)}% risk`, gx + (gx > S.W - 140 ? -14 : 14), gy - 8);
       }
@@ -196,6 +210,7 @@ function init(root) {
   }
 
   S.update = (d) => {
+    readTheme(); requestAnimationFrame(() => { readTheme(); S.dirty = true; });
     if (!S.meta) {
       S.meta = d.meta;
       const n = d.x.length;
@@ -257,8 +272,9 @@ def cohort_payload(test):
     }
 
 
-def cohort_map(test, selected_row, whatif_row, whatif_risk, on_pick):
+def cohort_map(test, selected_row, whatif_row, whatif_risk, on_pick, theme="dark"):
     payload = dict(cohort_payload(test))
+    payload["theme"] = theme
     sx, sy = _xy(selected_row.total_clicks, selected_row.mean_score_early)
     gx, gy = _xy(whatif_row["total_clicks"], whatif_row["mean_score_early"])
     payload["sel"] = {"x": sx, "y": sy, "k": int(selected_row.key)}

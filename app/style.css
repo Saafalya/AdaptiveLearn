@@ -1,49 +1,67 @@
-@import url('https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,100..900&family=Schibsted+Grotesk:wght@400;500;600;700&display=swap');
-
+/* Theme colours (--void, --panel, --text, --blue, ...) are injected per theme by ui.theme_css().
+   Fonts are the operating system's own: Segoe UI on Windows, San Francisco on macOS. */
 :root {
-  --void: #060a18;
-  --panel: #0c1328;
-  --panel-2: #111a35;
-  --line: rgba(150, 170, 230, 0.12);
-  --text: #e7ebf7;
-  --mute: #8e98b6;
-  --blue: #5b86ff;
-  --blue-soft: #8fb0ff;
-  --red: #ff4a66;
-  --red-soft: #ff8a9c;
-  --amber: #ffb35c;
-
-  /* chrome: bright top, dark horizon line, reflected light at the bottom */
-  --chrome-blue: linear-gradient(180deg, #dfe7ff 0%, #8aa7ff 30%, #2a4fd6 49%, #0d1a52 51%, #3a62e8 72%, #b9caff 100%);
-  --chrome-red: linear-gradient(180deg, #ffe1e6 0%, #ff8a9c 30%, #d61f3c 49%, #4c0612 51%, #e8324f 72%, #ffc0ca 100%);
-  --sheen: linear-gradient(105deg, transparent 40%, rgba(255, 255, 255, 0.9) 50%, transparent 60%);
-
   --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
-  --display: 'Archivo', system-ui, sans-serif;
-  --body: 'Schibsted Grotesk', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --display: "Arial Black", "Helvetica Neue", Arial, sans-serif;
+  --body: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --sheen: linear-gradient(105deg, transparent 40%, rgba(255, 255, 255, 0.9) 50%, transparent 60%);
 }
 
 /* ---------- Streamlit shell ---------- */
 .stApp {
   background:
-    radial-gradient(1100px 520px at 12% -10%, rgba(91, 134, 255, 0.16), transparent 65%),
-    radial-gradient(900px 480px at 100% 4%, rgba(255, 74, 102, 0.10), transparent 65%),
+    radial-gradient(1100px 520px at 12% -10%, var(--wash-blue), transparent 65%),
+    radial-gradient(900px 480px at 100% 4%, var(--wash-red), transparent 65%),
     var(--void);
   color: var(--text);
 }
-.stApp, .stApp p, .stApp label, .stApp li, .stApp input, .stMarkdown { font-family: var(--body); }
+.stApp, .stApp p, .stApp label, .stApp li, .stApp input, .stApp button, .stMarkdown { font-family: var(--body); }
 [data-testid="stMain"] p, [data-testid="stMain"] li { color: var(--text); }
 header[data-testid="stHeader"] { background: transparent; }
 section[data-testid="stSidebar"], [data-testid="stSidebarCollapsedControl"], [data-testid="collapsedControl"] { display: none !important; }
-.block-container { padding-top: 1.5rem; padding-bottom: 4rem; max-width: 1280px; }
-h1, h2, h3, h4 { font-family: var(--display); letter-spacing: -0.01em; color: var(--text); }
+.block-container { padding-top: 1.25rem; padding-bottom: 4rem; max-width: 1280px; }
+h1, h2, h3, h4 { font-family: var(--body); letter-spacing: -0.01em; color: var(--text); }
+
+/* Streamlit's own widgets, recoloured per theme */
+.stApp [data-baseweb="select"] > div,
+.stApp [data-testid="stNumberInput"] input,
+.stApp [data-testid="stNumberInputContainer"],
+.stApp [data-testid="stNumberInput"] button {
+  background-color: var(--field) !important; color: var(--text) !important; border-color: var(--line) !important;
+}
+.stApp [data-baseweb="select"] svg, .stApp [data-testid="stNumberInput"] button svg { fill: var(--mute) !important; color: var(--mute) !important; }
+.stApp [data-testid="stSelectbox"] [role="group"] { background-color: var(--field) !important; border-color: var(--line) !important; }
+.stApp [data-testid="stSelectbox"] [role="group"] *, .stApp [data-testid="stSelectbox"] input { color: var(--text) !important; }
+.stApp [data-baseweb="popover"] ul, .stApp [data-baseweb="menu"], .stApp [role="listbox"] { background-color: var(--panel) !important; }
+.stApp [role="option"] { color: var(--text) !important; }
+.stApp [data-baseweb="popover"] li { color: var(--text) !important; }
+.stApp [data-testid="stSliderThumbValue"], .stApp [data-testid="stSliderTickBarMin"], .stApp [data-testid="stSliderTickBarMax"] { color: var(--text) !important; font-family: var(--body); }
+.stApp [data-testid="stWidgetLabel"] p { color: var(--mute) !important; }
+
+/* ---------- appearance switch ---------- */
+.st-key-theme { display: flex; justify-content: flex-end; }
+.st-key-theme [data-testid="stButtonGroup"] { background: var(--panel); border: 1px solid var(--line); border-radius: 999px; padding: 3px; gap: 2px; }
+.st-key-theme button {
+  border: 0 !important; border-radius: 999px !important; background: transparent !important;
+  color: var(--mute) !important; font-size: 0.82rem !important; min-height: 30px !important; padding: 0 14px !important;
+  transition: transform 160ms var(--ease-out), background-color 150ms ease, color 150ms ease;
+}
+.st-key-theme button[kind="segmented_controlActive"], .st-key-theme button[aria-checked="true"], .st-key-theme button[data-testid="stBaseButton-segmented_controlActive"] {
+  background: var(--text) !important; color: var(--void) !important;
+}
+.st-key-theme button[aria-checked="true"] p, .st-key-theme button[aria-checked="true"] * { color: var(--void) !important; }
+.st-key-theme button:active { transform: scale(0.97); }
+.st-key-theme button:focus-visible { outline: 2px solid var(--blue-soft) !important; outline-offset: 2px; }
+@media (hover: hover) and (pointer: fine) {
+  .st-key-theme button:hover { color: var(--text) !important; }
+}
 
 /* ---------- hero ---------- */
-.al-hero { container-type: inline-size; padding: 8px 4px 0; }
+.al-hero { container-type: inline-size; padding: 4px 4px 0; }
 .al-word {
-  margin: 0; line-height: 0.82; white-space: nowrap;
-  font-family: var(--display); font-weight: 900; font-stretch: 125%;
-  letter-spacing: -0.035em; font-size: clamp(1.8rem, 9cqw, 9rem);
+  margin: 0; line-height: 0.9; white-space: nowrap;
+  font-family: var(--display); font-weight: 900;
+  letter-spacing: -0.03em; font-size: clamp(1.8rem, 10.2cqw, 9.5rem);
 }
 .al-word span {
   display: inline-block;
@@ -52,7 +70,7 @@ h1, h2, h3, h4 { font-family: var(--display); letter-spacing: -0.01em; color: va
   background-position: 150% 0, 0 0;
   background-repeat: no-repeat;
   -webkit-background-clip: text; background-clip: text; color: transparent;
-  filter: drop-shadow(0 1px 0 rgba(255, 255, 255, 0.25)) drop-shadow(0 18px 30px rgba(42, 79, 214, 0.35));
+  filter: drop-shadow(0 1px 0 var(--word-edge)) drop-shadow(0 18px 30px var(--glow-blue));
   animation: al-sheen 1700ms var(--ease-out) 300ms 1 both;
 }
 .al-word span + span {
@@ -61,7 +79,7 @@ h1, h2, h3, h4 { font-family: var(--display); letter-spacing: -0.01em; color: va
   background-position: 150% 0, 0 0;
   background-repeat: no-repeat;
   -webkit-background-clip: text; background-clip: text;
-  filter: drop-shadow(0 1px 0 rgba(255, 255, 255, 0.25)) drop-shadow(0 18px 30px rgba(214, 31, 60, 0.35));
+  filter: drop-shadow(0 1px 0 var(--word-edge)) drop-shadow(0 18px 30px var(--glow-red));
   animation-delay: 480ms;
 }
 @keyframes al-sheen {
@@ -80,33 +98,30 @@ h1, h2, h3, h4 { font-family: var(--display); letter-spacing: -0.01em; color: va
 .al-legend { display: flex; flex-wrap: wrap; gap: 6px 22px; margin: 0 0 10px; font-size: 0.85rem; color: var(--mute); }
 .al-legend span { display: inline-flex; align-items: center; gap: 8px; }
 .al-legend i { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
-.al-legend .k-blue { background: var(--blue); box-shadow: 0 0 10px rgba(91, 134, 255, 0.7); }
-.al-legend .k-red { background: var(--red); box-shadow: 0 0 10px rgba(255, 74, 102, 0.7); }
+.al-legend .k-blue { background: var(--blue); }
+.al-legend .k-red { background: var(--red); }
 .al-legend .k-sel { border: 2px solid var(--text); width: 11px; height: 11px; }
 .al-legend .k-ghost { background: radial-gradient(circle at 35% 35%, #fff, var(--blue) 55%); }
 
 .st-key-cohort {
-  border-radius: 22px; overflow: hidden;
-  border: 1px solid var(--line);
-  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.05) inset, 0 40px 80px -40px rgba(0, 0, 0, 0.9);
+  border-radius: 22px; overflow: hidden; border: 1px solid var(--line);
+  box-shadow: 0 1px 0 var(--inset) inset, 0 40px 80px -40px var(--shadow);
 }
 
 /* ---------- explorer ---------- */
 .al-head { margin: 56px 0 18px; scroll-margin-top: 24px; }
-.al-head h2 { margin: 0 0 6px; font-size: clamp(1.6rem, 3vw, 2.2rem); font-weight: 800; font-stretch: 112%; }
+.al-head h2 { margin: 0 0 6px; font-size: clamp(1.6rem, 3vw, 2.2rem); font-weight: 700; }
 .stApp .al-head p { margin: 0; color: var(--mute); font-size: 0.95rem; max-width: 70ch; }
 
 .st-key-controls {
   background: linear-gradient(180deg, var(--panel-2) 0%, var(--panel) 100%);
   border: 1px solid var(--line); border-radius: 20px; padding: 20px 20px 10px;
-  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.05) inset;
+  box-shadow: 0 1px 0 var(--inset) inset;
 }
-.st-key-controls h3 { font-family: var(--body); font-size: 0.95rem; font-weight: 600; margin: 4px 0 2px; color: var(--text); }
+.st-key-controls h3 { font-size: 0.95rem; font-weight: 600; margin: 4px 0 2px; color: var(--text); }
 .stApp .st-key-controls .al-hint { margin: 0 0 6px; font-size: 0.8rem; color: var(--mute); line-height: 1.45; }
-.st-key-controls label p, .st-key-controls [data-testid="stWidgetLabel"] p { color: var(--mute) !important; font-size: 0.85rem; }
 .st-key-controls hr { border-color: var(--line); margin: 14px 0; }
 
-/* the readout strip: one instrument panel instead of four cards */
 .al-readout {
   display: grid; grid-template-columns: 1fr 1.15fr 1fr 1.25fr;
   border: 1px solid var(--line); border-radius: 20px; overflow: hidden;
@@ -116,66 +131,81 @@ h1, h2, h3, h4 { font-family: var(--display); letter-spacing: -0.01em; color: va
 .al-cell:first-child { border-left: 0; }
 .al-cell__label { font-size: 0.8rem; color: var(--mute); }
 .al-cell__value {
-  font-family: var(--display); font-weight: 800; font-stretch: 115%; font-size: 2rem;
+  font-weight: 700; font-size: 2rem; letter-spacing: -0.02em;
   line-height: 1.1; margin: 6px 0 6px; color: var(--text); font-variant-numeric: tabular-nums;
 }
-.al-cell__value--name { font-size: 1.15rem; font-stretch: 100%; line-height: 1.25; margin-top: 10px; }
+.al-cell__value--name { font-size: 1.15rem; line-height: 1.25; margin-top: 10px; }
 .al-cell__note { font-size: 0.8rem; color: var(--mute); }
-.al-cell--risk::before {
-  content: ""; position: absolute; left: 0; right: 0; top: 0; height: 3px; background: var(--chrome-blue);
-}
-.al-cell--risk.is-medium::before { background: linear-gradient(90deg, var(--amber), #ffd59c); }
-.al-cell--risk.is-high::before { background: var(--chrome-red); }
-.al-meter { height: 6px; border-radius: 999px; background: rgba(150, 170, 230, 0.14); overflow: hidden; margin-top: 2px; }
-.al-meter i { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, var(--blue), var(--red)); transition: width 320ms var(--ease-out); }
+.al-cell--risk::before { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 3px; background: var(--blue); }
+.al-cell--risk.is-medium::before { background: var(--amber); }
+.al-cell--risk.is-high::before { background: var(--red); }
+.al-meter { height: 6px; border-radius: 999px; background: var(--track); overflow: hidden; margin-top: 2px; }
+.al-meter i { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, var(--blue), var(--red)); transition: width 240ms var(--ease-out); }
 .stApp .al-truth { margin: 10px 2px 0; font-size: 0.85rem; color: var(--mute); }
 .stApp .al-truth b { color: var(--text); }
 
-.al-sub { font-family: var(--body); font-weight: 600; font-size: 1rem; margin: 28px 0 10px; color: var(--text); }
+.al-sub { font-weight: 600; font-size: 1rem; margin: 28px 0 10px; color: var(--text); }
 
-/* study plan: a dated timeline, because the steps really are in order */
 .al-timeline { list-style: none; margin: 0; padding: 0 0 0 4px; position: relative; }
 .al-timeline::before {
   content: ""; position: absolute; left: 9px; top: 10px; bottom: 10px; width: 2px;
-  background: linear-gradient(180deg, var(--blue) 0%, rgba(91, 134, 255, 0.15) 100%);
+  background: linear-gradient(180deg, var(--blue) 0%, var(--track) 100%);
 }
 .al-timeline li { position: relative; padding: 0 0 18px 34px; }
 .al-timeline li::before {
   content: ""; position: absolute; left: 1px; top: 4px; width: 14px; height: 14px; border-radius: 50%;
-  background: var(--void); border: 2px solid var(--blue); box-shadow: 0 0 12px rgba(91, 134, 255, 0.55);
+  background: var(--void); border: 2px solid var(--blue);
 }
-.al-timeline li.is-urgent::before { border-color: var(--red); box-shadow: 0 0 12px rgba(255, 74, 102, 0.6); }
+.al-timeline li.is-urgent::before { border-color: var(--red); }
 .al-when { font-size: 0.8rem; font-weight: 600; color: var(--blue-soft); }
 .al-timeline li.is-urgent .al-when { color: var(--red-soft); }
 .stApp .al-action { margin: 2px 0 2px; font-weight: 600; font-size: 0.98rem; color: var(--text); }
-.stApp .al-detail { margin: 0 0 3px; font-size: 0.9rem; line-height: 1.5; color: #c9d0e4; max-width: 68ch; }
+.stApp .al-detail { margin: 0 0 3px; font-size: 0.9rem; line-height: 1.5; color: var(--text-2); max-width: 68ch; }
 .stApp .al-why { margin: 0; font-size: 0.8rem; color: var(--mute); }
 
 .al-note {
   padding: 14px 16px; border-radius: 14px; font-size: 0.87rem; line-height: 1.5; color: var(--mute);
-  border: 1px dashed rgba(150, 170, 230, 0.25); background: rgba(12, 19, 40, 0.6);
+  border: 1px dashed var(--line-strong); background: var(--panel);
 }
-.al-note code { font-size: 0.8rem; color: var(--blue-soft); background: rgba(91, 134, 255, 0.12); padding: 1px 6px; border-radius: 6px; }
+.al-note code { font-size: 0.8rem; color: var(--blue-soft); background: var(--track); padding: 1px 6px; border-radius: 6px; }
+
+/* ---------- results in plain words ---------- */
+.al-plain { margin-top: 64px; }
+.al-plain h2 { margin: 0 0 6px; font-size: clamp(1.4rem, 2.6vw, 1.9rem); font-weight: 700; }
+.stApp .al-plain > p { margin: 0 0 18px; color: var(--mute); font-size: 0.95rem; max-width: 70ch; }
+.al-table-wrap { border: 1px solid var(--line); border-radius: 18px; overflow-x: auto; background: var(--panel); }
+.al-table { width: 100%; border-collapse: collapse; font-size: 0.92rem; min-width: 720px; }
+.al-table th {
+  text-align: left; font-weight: 600; font-size: 0.82rem; color: var(--mute);
+  padding: 14px 18px; border-bottom: 1px solid var(--line); background: var(--panel-2);
+}
+.al-table td { padding: 16px 18px; border-bottom: 1px solid var(--line); vertical-align: top; color: var(--text); line-height: 1.5; }
+.al-table tr:last-child td { border-bottom: 0; }
+.al-table td:first-child { font-weight: 600; width: 26%; }
+.al-table td:nth-child(2) { width: 22%; color: var(--text-2); font-variant-numeric: tabular-nums; }
+.al-table .tag { display: inline-block; margin-top: 6px; padding: 1px 9px; border-radius: 999px; font-size: 0.75rem; font-weight: 600; }
+.al-table .tag-good { background: var(--good-bg); color: var(--good-fg); }
+.al-table .tag-ok { background: var(--ok-bg); color: var(--ok-fg); }
 
 /* ---------- how it works ---------- */
-.al-how { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 48px; margin-top: 64px; padding-top: 32px; border-top: 1px solid var(--line); }
-.al-how h3 { margin: 0 0 6px; font-size: 1.2rem; font-weight: 800; font-stretch: 110%; }
+.al-how { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 48px; margin-top: 56px; padding-top: 32px; border-top: 1px solid var(--line); }
+.al-how h3 { margin: 0 0 6px; font-size: 1.2rem; font-weight: 700; }
 .stApp .al-how p { margin: 0 0 18px; color: var(--mute); font-size: 0.92rem; line-height: 1.55; max-width: 50ch; }
 .al-sweep { display: flex; align-items: flex-end; gap: 10px; height: 120px; }
 .al-sweep div { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100%; gap: 6px; }
-.al-sweep i { width: 100%; border-radius: 5px 5px 2px 2px; background: linear-gradient(180deg, #8aa7ff 0%, #2a4fd6 100%); }
-.al-sweep div.is-now i { background: linear-gradient(180deg, #ff8a9c 0%, #d61f3c 100%); box-shadow: 0 0 18px rgba(255, 74, 102, 0.4); }
+.al-sweep i { width: 100%; border-radius: 5px 5px 2px 2px; background: var(--blue); opacity: 0.85; }
+.al-sweep div.is-now i { background: var(--red); opacity: 1; }
 .al-sweep small { font-size: 0.72rem; color: var(--mute); font-variant-numeric: tabular-nums; }
 .al-sweep em { font-style: normal; font-size: 0.72rem; font-weight: 600; color: var(--text); font-variant-numeric: tabular-nums; }
 .al-bars { display: grid; gap: 10px; }
 .al-bar { display: grid; grid-template-columns: 11.5rem 1fr 3rem; align-items: center; gap: 12px; font-size: 0.85rem; }
 .al-bar__name { color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.al-bar__track { height: 8px; border-radius: 999px; background: rgba(150, 170, 230, 0.12); overflow: hidden; }
-.al-bar__fill { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #2a4fd6, #8aa7ff); }
-.al-bar__fill.is-red { background: linear-gradient(90deg, #d61f3c, #ff8a9c); }
+.al-bar__track { height: 8px; border-radius: 999px; background: var(--track); overflow: hidden; }
+.al-bar__fill { display: block; height: 100%; border-radius: inherit; background: var(--blue); }
+.al-bar__fill.is-red { background: var(--red); }
 .al-bar__val { text-align: right; color: var(--mute); font-variant-numeric: tabular-nums; }
 
-.stApp .al-footer { margin-top: 48px; padding-top: 18px; border-top: 1px solid var(--line); font-size: 0.8rem; color: #6f7a99; }
+.stApp .al-footer { margin-top: 48px; padding-top: 18px; border-top: 1px solid var(--line); font-size: 0.8rem; color: var(--mute); }
 
 /* ---------- responsive ---------- */
 @media (max-width: 900px) {
@@ -189,5 +219,5 @@ h1, h2, h3, h4 { font-family: var(--display); letter-spacing: -0.01em; color: va
 
 @media (prefers-reduced-motion: reduce) {
   .al-word span { animation: none; }
-  .al-meter i { transition: none; }
+  .al-meter i, .st-key-theme button { transition: none; }
 }

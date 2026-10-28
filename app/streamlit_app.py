@@ -12,10 +12,24 @@ import altair as alt  # noqa: E402
 import pandas as pd  # noqa: E402
 import streamlit as st  # noqa: E402
 
+import importlib  # noqa: E402
+
+import cohort_map as _cohort  # noqa: E402
 import ui  # noqa: E402
 from adaptivelearn.config import MODEL_DIR, RESULTS_DIR, TABLE_DIR  # noqa: E402
 from adaptivelearn.inference import load_artifacts, profile  # noqa: E402
-from cohort_map import cohort_map  # noqa: E402
+
+
+def _fresh(mod):
+    """Streamlit re-runs this file on every interaction but keeps helper modules cached, and on
+    some Windows setups it misses edits to them. Reload a helper when its file has changed."""
+    if getattr(mod, "LOADED_MTIME", None) != Path(mod.__file__).stat().st_mtime:
+        mod = importlib.reload(mod)
+    return mod
+
+
+ui = _fresh(ui)
+cohort_map = _fresh(_cohort).cohort_map
 
 st.set_page_config(page_title="AdaptiveLearn", page_icon="🎓", layout="wide",
                    initial_sidebar_state="collapsed")
@@ -36,7 +50,10 @@ def artifacts():
 def reference_tables():
     metrics = json.loads((RESULTS_DIR / "metrics.json").read_text(encoding="utf-8"))
     sweep = pd.read_csv(TABLE_DIR / "early_prediction_sweep.csv")
-    return metrics, sweep
+    tables = {"fairness": pd.read_csv(TABLE_DIR / "fairness_audit.csv"),
+              "persona_mix": pd.read_csv(TABLE_DIR / "cluster_outcome_mix.csv", index_col=0),
+              "recommender": pd.read_csv(TABLE_DIR / "recommender_models.csv")}
+    return metrics, sweep, tables
 
 
 @st.cache_data
@@ -48,7 +65,7 @@ def held_out(df):
 
 
 art = artifacts()
-metrics, sweep = reference_tables()
+metrics, sweep, tables = reference_tables()
 df = art["enrolments"]
 test = held_out(df)
 by_key = test.set_index("key")
@@ -79,6 +96,24 @@ def on_module_change():
     ss.pres = presentations(ss.mod)[0]
     ss.num = 1
 
+
+# ---------- appearance (remembered in the address bar, so a refresh keeps it) ----------
+THEME_NAMES = list(ui.THEMES)
+if "theme" not in ss:
+    ss.theme = st.query_params.get("theme", "Dark") if st.query_params.get("theme") in THEME_NAMES else "Dark"
+
+
+def on_theme_change():
+    if not ss.theme:                      # clicking the active option deselects it; keep a theme
+        ss.theme = st.query_params.get("theme", "Dark")
+    st.query_params["theme"] = ss.theme
+
+
+st.segmented_control("Appearance", THEME_NAMES, key="theme", label_visibility="collapsed",
+                     on_change=on_theme_change)
+theme = ss.theme or "Dark"
+ui.theme_css(theme)
+colors = ui.chart_colors(theme)
 
 # ---------- hero ----------
 auc90 = float(sweep.loc[sweep.cutoff_day == 90, "at_risk_auc"].iloc[0])
@@ -138,22 +173,22 @@ with results:
         .mark_bar(cornerRadiusTopLeft=7, cornerRadiusTopRight=7, size=58)
         .encode(
             x=alt.X("outcome:N", sort=order, title=None,
-                    axis=alt.Axis(labelAngle=0, labelFontSize=12, labelColor="#c9d0e4", ticks=False,
+                    axis=alt.Axis(labelAngle=0, labelFontSize=12, labelColor=colors["axis"], ticks=False,
                                   domain=False, labelPadding=10)),
             y=alt.Y("probability:Q", title=None, scale=alt.Scale(domain=[0, 1]),
-                    axis=alt.Axis(format="%", tickCount=5, labelColor="#6f7a99", grid=True,
-                                  gridColor="#1a2442", domain=False, ticks=False)),
+                    axis=alt.Axis(format="%", tickCount=5, labelColor=colors["tick"], grid=True,
+                                  gridColor=colors["grid"], domain=False, ticks=False)),
             color=alt.Color("outcome:N", sort=order, legend=None,
                             scale=alt.Scale(domain=order,
-                                            range=["#8fb0ff", "#5b86ff", "#ff8a9c", "#ff4a66"])),
+                                            range=colors["bars"])),
             tooltip=["outcome", alt.Tooltip("probability:Q", format=".0%")],
         )
     )
     labels = bars.mark_text(dy=-10, fontSize=12, fontWeight=600).encode(
-        text=alt.Text("probability:Q", format=".0%"), color=alt.value("#e7ebf7"))
+        text=alt.Text("probability:Q", format=".0%"), color=alt.value(colors["label"]))
     st.altair_chart(
         (bars + labels).properties(height=250, background="transparent")
-        .configure_view(strokeWidth=0).configure(font="Schibsted Grotesk, system-ui, -apple-system, Segoe UI, sans-serif"),
+        .configure_view(strokeWidth=0).configure(font="system-ui, -apple-system, Segoe UI, Roboto, Helvetica Neue, Arial, sans-serif"),
         width="stretch",
     )
 
@@ -176,7 +211,8 @@ with results:
 
 # ---------- cohort map (top of page) ----------
 with map_slot:
-    cohort_map(test, base, row, out["at_risk"], on_pick)
+    cohort_map(test, base, row, out["at_risk"], on_pick, theme=theme)
 
+ui.plain_summary(metrics, tables)
 ui.how_it_works(sweep, ui.persona_shares(df))
 ui.footer()
