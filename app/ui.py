@@ -333,9 +333,6 @@ def about(metrics):
     render(f"""
     <div class="al-page-head">
       <h1>About the project</h1>
-      <p>AI-Based Personalized Learning Recommendation System Using Machine Learning. AUCML Lab ESE
-      project, Department of AIML, aligned with UN goals SDG 4 (Quality Education) and SDG 10
-      (Reduced Inequalities).</p>
     </div>
     <section class="al-about">
       <div class="al-about__main">
@@ -362,15 +359,6 @@ def about(metrics):
         <p>Open University Learning Analytics Dataset: <b>{d["n_enrolments_total"]:,}</b> enrolments,
         <b>{d["n_students_total"]:,}</b> students and <b>{d["n_click_rows_raw"] / 1e6:.1f} million</b>
         click records. Kuzilek, Hlosta and Zdrahal, Scientific Data 4:170171 (2017), CC BY 4.0.</p>
-        <h2 class="al-h3">Team</h2>
-        <ul class="al-list al-list--plain">
-          <li>Swastik Gavhane</li>
-          <li>Aryan Gawande</li>
-          <li>Saafalya Sengupta</li>
-        </ul>
-        <h2 class="al-h3">Run it yourself</h2>
-        <p>Double-click <code>start.bat</code> on Windows, or run <code>python run_website.py</code>.
-        Code: <a href="https://github.com/Saafalya/AdaptiveLearn" target="_blank" rel="noopener">github.com/Saafalya/AdaptiveLearn</a></p>
       </aside>
     </section>
     """)
